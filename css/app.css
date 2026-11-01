@@ -108,7 +108,7 @@ h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .hint{color:var(--ink-2);font-size:12.5px;margin:6px 0 0}
 .custom{color:var(--accent);font-size:11.5px;font-weight:600;margin-left:6px}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
-.filebtn{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:34px;position:relative}
+.filebtn{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:34px;position:relative;overflow:hidden}
 .filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .filebtn input{position:absolute;opacity:0;width:1px;height:1px}
 .filebtn.primary{gap:6px;background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
@@ -245,8 +245,10 @@ dialog::backdrop{background:rgba(20,24,28,.45)}
 #themeTxt{width:100%;height:340px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface-2);resize:vertical}
 
 .mobile-only{display:none!important}
+@media (min-width:901px){.ws.nopanel{grid-template-columns:200px minmax(0,1fr) 0}.ws.nopanel:has(.lib.min){grid-template-columns:58px minmax(0,1fr) 0}.ws.nopanel .panel{display:none}}
 @media (max-width:900px){
  .mobile-only{display:inline-grid!important}
+ .desk-only{display:none!important}
  .ws{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
  .lib{border-right:0;border-bottom:1px solid var(--line);display:flex;gap:4px;overflow-x:auto;padding:8px}
  .lib h2,.lib .hint{display:none}

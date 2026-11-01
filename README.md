@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.0.0.**
+made to be added to an iPad Home Screen. **Status: 1.0.1.**
 
 ## Stack
 
@@ -28,7 +28,8 @@ offline once loaded.
   with snap; drag from the library or tap to add; move and resize from every edge.
 - **Visuals:** card, column, bar, line, area, donut, table, slicer (list, dropdown, tiles, date range, field
   parameter), button, shape, text box and image. With a visual selected, tapping another type in the
-  library changes it after a confirmation. The library collapses to icons.
+  library changes it after a confirmation. The library collapses to icons, and on wide screens (iPad
+  landscape, desktop) the side panel button in the top bar hides the right panel to give the canvas more room.
 - **Multi-select:** Ctrl, Cmd or Shift + click, or **Select multiple** in the arrange bar on touch. Align
   left, centre, right, top, middle or bottom; distribute horizontally or vertically; drag the group.
 - **Pages:** a tab strip under the canvas. Each page has its own visuals, bookmarks and sketches; styling,
@@ -92,7 +93,8 @@ those on the live site.
 
 There is no automated test suite in the repo. Changes are checked by driving the app in Chromium with
 Playwright (service workers blocked so cached files can't hide a change), at desktop and iPad portrait
-(820 × 1180) sizes, and then on the iPad. `TECHNICAL.md` §13 lists the checks.
+(820 × 1180) sizes, in Chromium and WebKit (Safari's engine lays out some controls differently), and then
+on the iPad. `TECHNICAL.md` §13 lists the checks.
 
 ## Deploying
 

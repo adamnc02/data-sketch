@@ -52,14 +52,15 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
 - `save()` is debounced 350 ms, stamps the current wireframe or template's `updated`, and writes the whole
   store. Call it after every change to persisted state. The top bar shows Saving…, Saved, or "Not saved:
   storage unavailable".
-- Per-device preference: `localStorage` key `datasketch-libmin` (`'1'` when the visuals library is
-  collapsed). Read and written inside `try`.
+- Per-device preferences: `localStorage` keys `datasketch-libmin` (`'1'` when the visuals library is
+  collapsed) and `datasketch-panelmin` (`'1'` when the right panel is hidden). Read and written inside
+  `try`.
 
 ## 3. State
 
 - `store` (persisted): `{ version, templates: [...], wireframes: [...] }`.
 - `ui` (transient): `mode` (`'wf'` wireframe or `'tpl'` template), `view` (`'home' | 'editor'`), `wfId`,
-  `sel` (selected visual id), `multi` (set of ids when several are selected), `multiMode` (Select multiple
+  `sel` (selected visual id), `panelMin` (right panel hidden), `multi` (set of ids when several are selected), `multiMode` (Select multiple
   toggle), `panel` / `tab` / `panelOpen`, `zoom` / `scale`, `libMin`, `flipped` (notes), `hl`
   (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes),
   `skUndo` / `skRedo`, `drawing`, `ghost` (show hidden visuals faintly), `vdata` (computed visual data for
@@ -148,8 +149,12 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure], ...] }` in page coordinate
   and switches re-render and restore focus from a selector.
 - The page tabs (`renderPages()`) and the arrange bar (`renderArrange()`) sit outside the scrolling stage,
   in `.mid`.
+- Screens wider than 900px: the side panel button (`#panelBtn`, `setPanelMin()`) hides the right panel by
+  adding `.nopanel` to `.ws`, which sets the panel column to 0 and lets the canvas take the space. The
+  panel stays hidden while visuals are selected; `openSheet(id, true)` (Enter on a visual, Layers select)
+  and `showTab()` show it again.
 - Screens 900px wide or less: the library becomes a horizontal strip and the panel an overlay inside
-  `.ws`, opened from the menu button.
+  `.ws`, opened from the menu button; `.nopanel` has no effect there.
 
 ## 7. Events and conventions
 
@@ -264,8 +269,9 @@ Every import runs `normalize()`, so files from earlier versions (no pages, no ca
 
 ## 13. Checks
 
-Serve the repo over http and drive it in Chromium with Playwright, service workers blocked, at desktop
-and iPad portrait (820 × 1180):
+Serve the repo over http and drive it with Playwright, service workers blocked, at desktop and iPad
+portrait (820 × 1180), in Chromium and in WebKit (layout differences such as the file-input overflow in §14
+only show in WebKit):
 
 - No page errors or console errors; home shows Operations and Northwind Logistics on a fresh store.
 - Open the wireframe; every panel tab renders; clicking bars highlights; bookmarks apply.
@@ -277,6 +283,8 @@ and iPad portrait (820 × 1180):
   still loads.
 - Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; undo.
 - Light and dark logo; CSV export downloads.
+- Side panel hides and shows on wide screens; the panel never scrolls sideways (`scrollWidth` equals
+  `clientWidth` on every tab and edit sheet, in WebKit).
 
 On the iPad: Pencil pressure, two-finger undo, dragging visuals without the page scrolling, Add to Home
 Screen and offline launch.
@@ -287,6 +295,10 @@ Screen and offline launch.
   scaled, scrolling stage: Safari still pans and fires `pointercancel`, which ends the drag. A non-passive
   `touchmove` listener calls `preventDefault()` when the touch is on a visual (not a textarea) or while
   drawing. The grey stage still scrolls.
+- **WebKit lays out a hidden file input at full width.** The upload buttons (`.filebtn`) hide their
+  `<input type="file">` at 1px with no opacity, but Safari still lays out its built-in button and label,
+  which made the right panel 15px too wide and scroll sideways. `.filebtn` has `overflow: hidden`. Chromium
+  clips them anyway, so only a WebKit check catches this.
 - **Generic class names collide.** The drag preview is `.dragghost` because `button.ghost` is the top bar's
   back button style.
 - **Top bar flex.** `.bar > *` is `flex: none` and the name field has a fixed flex basis, so inputs can't

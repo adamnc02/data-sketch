@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -23,6 +23,7 @@ const I = {
   'al-r': ic('<path d="M20 3v18"/><rect x="5" y="6" width="12" height="4" rx="1"/><rect x="10" y="14" width="7" height="4" rx="1"/>'), 'al-t': ic('<path d="M3 4h18"/><rect x="6" y="7" width="4" height="12" rx="1"/><rect x="14" y="7" width="4" height="7" rx="1"/>'),
   'al-m': ic('<path d="M3 12h18"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="8" width="4" height="8" rx="1"/>'), 'al-b': ic('<path d="M3 20h18"/><rect x="6" y="5" width="4" height="12" rx="1"/><rect x="14" y="10" width="4" height="7" rx="1"/>'),
   'ds-h': ic('<path d="M4 3v18M20 3v18"/><rect x="9" y="7" width="6" height="10" rx="1"/>'), 'ds-v': ic('<path d="M3 4h18M3 20h18"/><rect x="7" y="9" width="10" height="6" rx="1"/>'),
+  sidepanel: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>'),
   x: ic(P.close), back: ic('<path d="M15 5l-7 7 7 7"/>'), fwd: ic('<path d="M9 5l7 7-7 7"/>'),
   more: ic('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'), plus: ic('<path d="M12 5v14M5 12h14"/>'),
   up: ic('<path d="M6 15l6-6 6 6"/>'), down: ic('<path d="M6 9l6 6 6-6"/>'),
@@ -101,7 +102,7 @@ function setSaved(t) { const el = $('#saved'); if (el) el.textContent = t; }
 /* ---------- model helpers ---------- */
 const ui = {
   mode: 'wf', view: 'home', wfId: null, sel: null, panel: 'tab', tab: 'settings', panelOpen: false, flipped: new Set(), hl: null, hlBefore: null, last: null,
-  zoom: 'fit', scale: 1, libMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, pop: false },
+  zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, pop: false },
   skUndo: [], skRedo: [], drawing: false, ghost: false, paramSel: {}, slicerSel: {}, dropOpen: null, bmOpen: null, mOpen: null, vdata: new Map(), exportCache: null
 };
 const cur = () => ui.mode === 'tpl' ? store.templates.find(t => t.id === ui.wfId) : store.wireframes.find(w => w.id === ui.wfId);
@@ -477,17 +478,24 @@ function openWf(id, mode = 'wf') {
   ui.sk.on = false; ui.sk.pop = false; ui.vdata.clear();
   const o = cur(), T_ = mode === 'tpl';
   ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
-  try { ui.libMin = localStorage.getItem('datasketch-libmin') === '1'; } catch (e) {}
+  try { ui.libMin = localStorage.getItem('datasketch-libmin') === '1'; ui.panelMin = localStorage.getItem('datasketch-panelmin') === '1'; } catch (e) {}
   const tn = T_ ? 'Client template' : tplOf(o)?.client;
   $('#app').innerHTML = `<header class="bar"><button class="ghost" data-act="home">${I.back}Wireframes</button>
  <input type="text" class="wfname" data-wfname value="${esc(T_ ? o.client : o.name)}" aria-label="${T_ ? 'Client name' : 'Wireframe name'}">
  ${tn ? `<span class="meta client">${esc(tn)}</span>` : ''}<span class="saved" id="saved">Saved</span><span class="spacer"></span>
  <select id="zoom" aria-label="Zoom"><option value="fit">Fit</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option></select>
- ${T_ ? '' : `<button data-act="sketch" id="skBtn" aria-pressed="false">${I.pencil}Sketch</button>`}<button data-act="theme">Theme JSON</button><button class="mobile-only icon" data-act="togglepanel" aria-label="Settings, layers, bookmarks and data">${I.menu}</button></header>
- <div class="ws">${libHTML()}
+ ${T_ ? '' : `<button data-act="sketch" id="skBtn" aria-pressed="false">${I.pencil}Sketch</button>`}<button data-act="theme">Theme JSON</button><button class="desk-only icon" data-act="panelmin" id="panelBtn"></button><button class="mobile-only icon" data-act="togglepanel" aria-label="Settings, layers, bookmarks and data">${I.menu}</button></header>
+ <div class="ws ${ui.panelMin ? 'nopanel' : ''}">${libHTML()}
  <div class="mid"><main class="stage" id="stage"><div id="sktools"></div><div class="sizer" id="sizer"><div class="wrap" id="wrap"></div></div></main><div id="arrange"></div>${T_ ? '' : '<nav class="pagetabs" id="pagetabs" aria-label="Pages"></nav>'}</div>
  <aside class="panel" id="panel" aria-label="Settings"></aside></div>`;
-  $('#zoom').value = ui.zoom; renderPage(); renderPanel(); renderPages();
+  $('#zoom').value = ui.zoom; setPanelMin(ui.panelMin); renderPage(); renderPanel(); renderPages();
+}
+// Wide screens only: hides the right panel column. Narrow screens use the slide-over panel instead.
+function setPanelMin(on) {
+  ui.panelMin = on; try { localStorage.setItem('datasketch-panelmin', on ? '1' : '0'); } catch (e) {}
+  $('.ws')?.classList.toggle('nopanel', on);
+  const b = $('#panelBtn'); if (b) { const l = on ? 'Show side panel' : 'Hide side panel'; b.innerHTML = I.sidepanel; b.setAttribute('aria-pressed', !on); b.setAttribute('aria-label', l); b.title = l; }
+  fit();
 }
 function libHTML() {
   const T_ = ui.mode === 'tpl', min = !!ui.libMin;
@@ -696,9 +704,9 @@ function renderPanel(focusSel) {
   p.classList.toggle('open', ui.panelOpen);
   if (focusSel) p.querySelector(focusSel)?.focus();
 }
-function openSheet(id, force) { setSel(id); ui.panel = 'visual'; if (force || wide()) ui.panelOpen = true; renderPanel(); }
+function openSheet(id, force) { setSel(id); ui.panel = 'visual'; if (force || wide()) ui.panelOpen = true; if (force && ui.panelMin) setPanelMin(false); renderPanel(); }
 function refreshSide() { if (ui.panel === 'tab' && ['layers', 'bookmarks'].includes(ui.tab)) renderPanel(); }
-function showTab(tab) { ui.panel = 'tab'; ui.tab = tab; ui.panelOpen = true; renderPanel(); }
+function showTab(tab) { ui.panel = 'tab'; ui.tab = tab; ui.panelOpen = true; if (ui.panelMin) setPanelMin(false); renderPanel(); }
 
 /* ---------- visual ops ---------- */
 function snapV(n) { const g = cur().grid; return g.snap ? Math.round(n / g.size) * g.size : Math.round(n); }
@@ -1073,6 +1081,7 @@ document.addEventListener('click', e => {
     case 'flipback': flipOne(b.closest('.vis').dataset.id, false); break;
     case 'closesheet': ui.panel = 'tab'; renderPanel(); break;
     case 'tab': ui.tab = b.dataset.val; ui.panel = 'tab'; renderPanel(`[data-act=tab][data-val=${ui.tab}]`); break;
+    case 'panelmin': setPanelMin(!ui.panelMin); break;
     case 'togglepanel': ui.panelOpen = !ui.panelOpen; $('#panel').classList.toggle('open', ui.panelOpen); break;
     case 'notesmode': setNotesMode(b.dataset.val); break;
     case 'applytpl': { const t = store.templates.find(x => x.id === $('#tplSel').value); if (!t) break; arm(b, 'Confirm', () => { o.templateId = t.id; o.settings = clone(t.settings); setSize(o.settings.pageW, o.settings.pageH); }); break; }
