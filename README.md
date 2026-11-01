@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.0.2.**
+made to be added to an iPad Home Screen. **Status: 1.1.0.**
 
 ## Stack
 
@@ -41,9 +41,17 @@ offline once loaded.
 - **Data tab:** measures (type, format, size, trend, strength, seasonality and stories such as "top
   performer"), dimensions and member names, currency, regenerate values, and export of a star schema as
   CSVs with matching DAX measures.
-- **Sketch:** the **Sketch** button switches Apple Pencil from editing (select, move, resize) to drawing.
-  Pencil, pen, brush, highlighter and eraser, pressure-sensitive, with undo, redo and two-finger-tap undo.
-  Each drawing tool has its own sizes and a Stability slider (smoothing, 0–90), kept per device.
+- **Sketch:** the **Sketch** button switches Apple Pencil from editing to drawing. In Sketch mode the Pencil
+  (and a mouse) draws while a finger keeps selecting, moving and resizing visuals; "Finger draws in Sketch
+  mode" lets a finger draw instead. Pencil, pen, brush, highlighter, fill and eraser; pressure-sensitive,
+  and the pencil and brush broaden when the Pencil is tilted past writing angle. Each drawing tool has its
+  own sizes and a Stability slider (smoothing, 0–90), kept per device.
+- **QuickShape:** draw and hold still at the end; a line, rectangle or ellipse snaps clean. A snapped
+  rectangle offers **Make visual**, which places any visual type in exactly that box.
+- **Fill:** tap inside a closed drawing (a snapped rectangle or ellipse, or any outline whose ends meet) to
+  fill it with the chosen colour; the same colour again clears it.
+- **Gestures (any mode):** pinch to zoom, drag with two fingers to pan. In Sketch mode, a two-finger tap
+  undoes and a three-finger tap redoes.
 - **Theme JSON:** a Power BI theme file from the current styling, to copy or download.
 
 ## Rules that must not be quietly undone

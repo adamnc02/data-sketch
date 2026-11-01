@@ -108,7 +108,9 @@ align, textColor, src, fit, notes, ov, hidden`.
 Bookmark (per page): `{ id, name, affects: [visualIds], hidden: [visualIds] }`. Applying one sets `hidden`
 only on visuals in `affects`; the rest are "Not affected". New visuals are not added to existing bookmarks.
 
-Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure], ...] }` in page coordinates.
+Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill? }` in page coordinates.
+`tilt` (0–1) is only stored when above zero; `shape` is `'line' | 'rect' | 'ellipse'` after a QuickShape snap;
+`fill` is a colour.
 
 ## 5. The data engine (`js/data.js`)
 
@@ -224,21 +226,63 @@ the template's settings, including canvas size. The Layers tab can hide the temp
 
 ## 9. Sketch and Apple Pencil
 
-- The Sketch button toggles `ui.sk.on`. Off: the Pencil works like a finger (select, move, resize). On:
-  Pencil, finger and mouse draw, the sketch toolbar shows, and the button is highlighted.
-- `pencilDraws` (Canvas tab, "Apple Pencil draws outside Sketch mode") makes the Pencil draw with Sketch
-  off. Only `true` turns it on; missing means off.
-- Tools: pencil, pen, brush, highlighter, eraser. Tapping a tool selects it and shows its sizes and, for
-  every tool but the eraser, a Stability slider (0–90, step 5). Tapping it again hides them. Strokes are
-  pressure-sensitive outlines built from `getCoalescedEvents` and brush-tapered.
+### Who draws
+The pointer's `pointerType` says whether the Pencil (`pen`), a finger (`touch`) or a mouse made it.
+`pointerdown` decides, for wireframes only:
+
+| | Pencil | Finger | Mouse |
+| --- | --- | --- | --- |
+| Sketch off | edits (draws only with `pencilDraws`) | edits | edits |
+| Sketch on | draws | edits (draws only with `fingerDraws`) | draws |
+
+`pencilDraws` ("Apple Pencil draws outside Sketch mode") and `fingerDraws` ("Finger draws in Sketch mode")
+are wireframe flags in the Canvas tab; only `true` turns either on. Resize handles show in Sketch mode so a
+finger can resize. A Pencil `pointerdown` cancels a finger drag in progress (`dragCancel`), so a palm that
+lands first does not keep moving a visual; touches that start while the Pencil is drawing are ignored.
+
+### Gestures
+Touches on the stage are tracked in `touches` in every mode. A second finger starts a gesture
+(`startGesture()`): it cancels a stroke or drag in progress and records the starting zoom and the page point
+under the fingers. Moving two fingers calls `pinch()`, which sets `ui.zoom` from the change in finger
+distance (20% to 300%) and scrolls the stage so the same page point stays under the fingers' midpoint;
+the zoom select shows the result as a percentage (`syncZoom()`). On lifting, an unmoved tap under 450 ms
+undoes (two fingers) or redoes (three) in Sketch mode. `.stage` has `touch-action: none` and Safari's own
+`gesturestart` is cancelled, so pinching zooms the canvas, not the app; one finger on the grey stage no
+longer scrolls (two fingers pan).
+
+### Tools and strokes
+- Tools: pencil, pen, brush, highlighter, fill, eraser. Tapping a tool selects it and shows its sizes and,
+  for drawing tools, a Stability slider (0–90, step 5); fill shows how to use it. Tapping it again hides
+  them. Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
+  tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
 - Stability is an exponential moving average on the input points: each new point moves the stroke
   `1 - stability / 100` of the way towards the pointer. `stabOf(tool)` reads `ui.sk.stab[tool]`, falling back
-  to the tool's built-in `smooth` (pencil 30, brush 50, pen and highlighter 60). At 90 the line trails the
-  pointer, so on lift the raw final point is added and the stroke still ends where the Pencil left the
+  to the tool's built-in `smooth` (pencil 30, brush 50, pen and highlighter 60). At high values the line
+  trails the pointer, so on lift the raw final point is added and the stroke ends where the Pencil left the
   screen. Dragging the slider updates `ui.sk.stab` without re-rendering the toolbar, so the slider keeps
-  the touch; the eraser removes
-  whole strokes. Undo and redo stacks hold up to 60 states; a two-finger tap in Sketch mode undoes. Touches
-  that arrive while a stroke is in progress are ignored (palm rejection).
+  the touch.
+- Tilt: `tiltOf()` turns the Pencil's `altitudeAngle` (or `tiltX` / `tiltY` when that is all the browser
+  gives) into 0 at 50° from the glass or steeper, rising to 1 lying flat, so normal writing is unaffected.
+  It is stored as a point's fourth value and multiplies the outline width by `1 + tilt × TOOLS[tool].tilt`
+  (pencil 2.5, brush 1.2).
+- Undo and redo stacks hold up to 60 sketch states (strokes, QuickShape snaps and fills).
+
+### QuickShape
+While drawing, a pause of 550 ms without moving more than 4px (`armHold`) runs `quickShape()` on the stroke:
+a chord over 92% of the path length is a **line**; a closed path (ends within 30% of its size) whose
+corners are all close to its bounding box is a **rectangle** (axis-aligned); otherwise one close to the
+box's inscribed ellipse is an **ellipse**; anything else stays as drawn. The snapped shape replaces the
+stroke's points (densified every 6px, average pressure and tilt) and sets `shape`; further movement before
+lifting is ignored. After a rectangle, the **Make visual** chip (`showQS()`, fixed-position, gone after a few
+seconds or on the next tap) opens a menu of every visual type; `qsMake()` places that visual in the box,
+snapped to the grid, removes the drawing and opens its edit sheet.
+
+### Fill
+`fillAt()` fills the topmost closed drawing under a Fill tap with the chosen colour (`fill` on the stroke);
+the same colour again clears it. Closed means a QuickShape rectangle or ellipse, or a stroke whose ends are
+within 15% of its size (`closedStroke()`); the hit test is point-in-polygon on the stroke's points.
+`strokeSVG()` draws the fill under the line.
+
 - Sketches belong to the page; Show sketches hides them without deleting.
 
 ## 10. Export and import
@@ -291,22 +335,29 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
 - Canvas size presets and custom values; visuals stay on the page.
 - Export each kind and import it back; a wrong-kind import explains itself; an old backup without pages
   still loads.
-- Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; undo. Stability:
+- Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; in Sketch mode a
+  finger (CDP `Input.dispatchTouchEvent`) moves and resizes while the Pencil and mouse draw; `fingerDraws`
+  lets a finger draw. A second finger cancels a drag; two- and three-finger taps undo and redo; pinch zooms
+  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a held rough
+  box, circle and line snap, the same box without a hold and a held scribble do not; Make visual places a
+  visual in the box; Fill fills a snapped box and a freehand loop, clears with the same colour, explains a
+  tap on an open line, and undoes. Stability:
   each tool shows its default, the eraser has none, the same zigzag at 90 is much shorter than at 0 and
   still ends at the lift point, and the value survives a reload.
 - Light and dark logo; CSV export downloads.
 - Side panel hides and shows on wide screens; the panel never scrolls sideways (`scrollWidth` equals
   `clientWidth` on every tab and edit sheet, in WebKit).
 
-On the iPad: Pencil pressure, two-finger undo, dragging visuals without the page scrolling, Add to Home
-Screen and offline launch.
+On the iPad: Pencil pressure and tilt feel, finger editing while the Pencil draws (and palm rejection),
+pinch and pan, two- and three-finger taps, QuickShape hold timing, dragging visuals without the page
+scrolling, Add to Home Screen and offline launch.
 
 ## 14. Traps
 
 - **iPad Safari pans during drags.** `touch-action: none` on `.page` and `.vis` is not enough inside the
   scaled, scrolling stage: Safari still pans and fires `pointercancel`, which ends the drag. A non-passive
   `touchmove` listener calls `preventDefault()` when the touch is on a visual (not a textarea) or while
-  drawing. The grey stage still scrolls.
+  drawing. `.stage` itself has `touch-action: none`; the canvas pans with two fingers.
 - **WebKit lays out a hidden file input at full width.** The upload buttons (`.filebtn`) hide their
   `<input type="file">` at 1px with no opacity, but Safari still lays out its built-in button and label,
   which made the right panel 15px too wide and scroll sideways. `.filebtn` has `overflow: hidden`. Chromium
@@ -324,7 +375,11 @@ Screen and offline launch.
 
 ## 15. Limits
 
-- Web apps get Apple Pencil pressure and tilt, but not double-tap, squeeze, barrel roll or haptics.
+- Web apps get Apple Pencil pressure, tilt and hover, but not double-tap, squeeze, barrel roll (WebKit's
+  `twist` reads 0) or haptics. Hover is not used. Drawing latency is close to, but not, native: Safari 18.2+
+  offers `getPredictedEvents()`, which the app does not use yet.
+- A Pencil resting palm is only guarded against once the Pencil touches: a palm that lands first can start a
+  finger drag, which the Pencil's touch then cancels.
 - Text boxes have one size, weight, colour and alignment, and no italics.
 - Fact.csv export stops above 300,000 rows.
 - Plain http on a LAN address has no service worker, install or share sheet; those need the live https

@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.1.0';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -62,10 +62,11 @@ const FONTS = [["'Segoe UI', system-ui, sans-serif", 'Segoe UI'], ['Arial, Helve
 const BASE = { title: 'Sales overview', headerBg: '#1F3A5F', headerFg: '#FFFFFF', pageBg: '#F3F2F1', visualBg: '#FFFFFF', font: FONTS[0][0], palette: ['#118DFF', '#12239E', '#E66C37', '#6B007B', '#E044A7', '#744EC2'], radius: 4, border: false, borderColor: '#C8C6C4', shadow: false, dataLabels: false, axisLabels: true, legend: true, gridlines: true, tooltips: true, titleSize: 11, headerH: 60, showHeader: true, logo: null, pageW: 1280, pageH: 720 };
 const PAGE_SIZES = [[1280, 720, '16:9'], [1600, 900, '16:9 large'], [1600, 800, '2:1'], [960, 720, '4:3'], [816, 1056, 'Letter'], [320, 240, 'Tooltip']];
 const TOOLS = {
-  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], smooth: .3, op: .9, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
+  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .9, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
   pen: { label: 'Pen', sizes: [1.5, 2.5, 4, 7], press: null, smooth: .6, op: 1, icon: '<path d="M12 19l7-7-4-4-7 7-1 5z"/><path d="M15 8l2-5 4 4-5 2"/>' },
-  brush: { label: 'Brush', sizes: [4, 8, 14, 24], press: [.12, 1.7], taper: true, smooth: .5, op: 1, icon: '<path d="M10 14l8-10a2 2 0 013 2.5L13 16"/><path d="M9 14c-3 0-4 2-4 4 0 1-1 2-2 2 4 1 9 0 9-4z"/>' },
+  brush: { label: 'Brush', sizes: [4, 8, 14, 24], press: [.12, 1.7], taper: true, tilt: 1.2, smooth: .5, op: 1, icon: '<path d="M10 14l8-10a2 2 0 013 2.5L13 16"/><path d="M9 14c-3 0-4 2-4 4 0 1-1 2-2 2 4 1 9 0 9-4z"/>' },
   marker: { label: 'Highlighter', sizes: [10, 16, 24, 34], press: null, smooth: .6, op: .35, cap: 'butt', icon: '<path d="M9 12l-5 5v3h3l5-5"/><path d="M8 11l7-7 5 5-7 7z"/>' },
+  fill: { label: 'Fill', icon: '<path d="M5 11l6-6 8 8-6 6a2 2 0 01-2.8 0L5 13.8a2 2 0 010-2.8z"/><path d="M5 12h13"/><path d="M20 15s1.5 2 1.5 3a1.5 1.5 0 01-3 0c0-1 1.5-3 1.5-3z"/>' },
   eraser: { label: 'Eraser', sizes: [10, 20, 36, 56], icon: '<path d="M8 20h12"/><path d="M4.5 14.5l9-9 6 6-7 7H9z"/>' }
 };
 const stabOf = t => ui.sk.stab[t] ?? Math.round((TOOLS[t].smooth || 0) * 100);
@@ -462,6 +463,7 @@ function thumbRects(list, S) {
 }
 function thumb(o) { const s = o.settings, tpl = tplOf(o), p = o.pages ? o.pages[0] : o; return `<svg viewBox="0 0 ${s.pageW} ${s.pageH}" aria-hidden="true"><rect width="${s.pageW}" height="${s.pageH}" fill="${s.pageBg}"/>${s.showHeader !== false ? `<rect width="${s.pageW}" height="${s.headerH}" fill="${s.headerBg}"/>` : ''}${tpl && !o.hideLayout ? thumbRects(tpl.visuals, tpl.settings) : ''}${thumbRects(p.visuals, s)}${o.showSketch === false ? '' : (p.sketch || []).map(strokeSVG).join('')}</svg>`; }
 function renderHome() {
+  clearQS();
   ui.view = 'home'; ui.wfId = null; ui.hl = null; $('#tip').hidden = true;
   const wfs = store.wireframes.slice().sort((a, b) => b.updated - a.updated), tn = id => store.templates.find(t => t.id === id)?.client || 'No template';
   const when = t => new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -490,7 +492,7 @@ function openWf(id, mode = 'wf') {
  <div class="ws ${ui.panelMin ? 'nopanel' : ''}">${libHTML()}
  <div class="mid"><main class="stage" id="stage"><div id="sktools"></div><div class="sizer" id="sizer"><div class="wrap" id="wrap"></div></div></main><div id="arrange"></div>${T_ ? '' : '<nav class="pagetabs" id="pagetabs" aria-label="Pages"></nav>'}</div>
  <aside class="panel" id="panel" aria-label="Settings"></aside></div>`;
-  $('#zoom').value = ui.zoom; setPanelMin(ui.panelMin); renderPage(); renderPanel(); renderPages();
+  clearQS(); setPanelMin(ui.panelMin); renderPage(); syncZoom(); renderPanel(); renderPages();
 }
 // Wide screens only: hides the right panel column. Narrow screens use the slide-over panel instead.
 function setPanelMin(on) {
@@ -590,7 +592,7 @@ function settingsBody() {
  <section><h3>All visuals</h3>${visualFields(s)}</section>
  <section><h3>Theme colours</h3>${F.pal('data-pal', s.palette)}</section>
  <section><h3>Grid</h3><label class="field"><span>Grid size (px)</span><input type="number" min="5" max="60" data-g="size" value="${g.size}" style="width:80px"></label>${F.sw('g', 'snap', 'Snap to grid', g.snap)}${F.sw('g', 'show', 'Show grid', g.show)}</section>
- ${T_ ? '' : `<section><h3>Sketch</h3>${F.sw('k', 'pencilDraws', 'Apple Pencil draws outside Sketch mode', o.pencilDraws === true)}${F.sw('k', 'showSketch', 'Show sketches', o.showSketch !== false)}<p class="hint">Turn on Sketch in the top bar to draw. With Sketch off, Apple Pencil selects, moves and resizes visuals like a finger. In Sketch mode, tap with two fingers to undo.</p></section>
+ ${T_ ? '' : `<section><h3>Sketch</h3>${F.sw('k', 'pencilDraws', 'Apple Pencil draws outside Sketch mode', o.pencilDraws === true)}${F.sw('k', 'fingerDraws', 'Finger draws in Sketch mode', o.fingerDraws === true)}${F.sw('k', 'showSketch', 'Show sketches', o.showSketch !== false)}<p class="hint">Turn on Sketch in the top bar to draw with Apple Pencil; your finger keeps selecting, moving and resizing visuals. With Sketch off, the Pencil works like a finger. Draw and hold to snap a line, rectangle or ellipse. Pinch to zoom and drag with two fingers to pan; in Sketch mode, tap with two fingers to undo and three to redo.</p></section>
  <section><h3>Notes</h3>${segH('notesmode', o.notesMode, [['hidden', 'On flip'], ['flip', 'Reveal all'], ['side', 'Alongside']], 'Notes display')}<p class="hint">Double-click any visual to flip it and type notes.</p></section>`}`;
 }
 function layersBody() {
@@ -724,7 +726,7 @@ function addVisual(type, x, y) {
   pg().visuals.push(v); renderPage(); openSheet(v.id); save();
 }
 function goPage(id) {
-  const o = cur(); o.pageId = id;
+  const o = cur(); o.pageId = id; clearQS();
   Object.assign(ui, { sel: null, multi: new Set(), hl: null, skUndo: [], skRedo: [], paramSel: {}, slicerSel: {}, dropOpen: null });
   ui.vdata.clear(); ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
   if (ui.panel === 'visual') ui.panel = 'tab';
@@ -783,20 +785,45 @@ function download(name, text, type = 'text/csv') { const url = URL.createObjectU
 
 /* ---------- pointer: canvas ---------- */
 function clearSel() { ui.multi.clear(); setSel(null); if (ui.dropOpen) { ui.dropOpen = null; renderPage(); } if (ui.panel === 'visual') { ui.panel = 'tab'; ui.tab = 'settings'; renderPanel(); } else refreshSide(); }
-const touches = new Map(); let gesture = null, strokeCancel = null;
+// Touches on the stage. Two or more fingers are a gesture in every mode: pinch zooms, two fingers drag to pan,
+// a two-finger tap undoes and a three-finger tap redoes (Sketch mode). One finger always edits unless fingerDraws.
+const touches = new Map(); let gesture = null, strokeCancel = null, dragCancel = null;
+function startGesture() {
+  if (strokeCancel) strokeCancel(); if (dragCancel) dragCancel(); clearQS();
+  const [a, b] = [...touches.values()], r = $('#page').getBoundingClientRect(), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+  gesture = { t: Date.now(), moved: false, max: 2, d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: ui.scale, px: (cx - r.left) / ui.scale, py: (cy - r.top) / ui.scale };
+}
+function pinch() {
+  const [a, b] = [...touches.values()], cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, d = Math.hypot(a.x - b.x, a.y - b.y);
+  ui.zoom = String(+clamp(gesture.s0 * d / gesture.d0, .2, 3).toFixed(3)); fit(); syncZoom();
+  const st = $('#stage'), r = $('#page').getBoundingClientRect();
+  st.scrollLeft += r.left - (cx - gesture.px * ui.scale); st.scrollTop += r.top - (cy - gesture.py * ui.scale);
+}
+function syncZoom() {
+  const z = $('#zoom'); if (!z) return;
+  let o = z.querySelector('[data-custom]');
+  if ([...z.options].some(x => !x.dataset.custom && x.value === ui.zoom)) { if (o) o.remove(); z.value = ui.zoom; return; }
+  if (!o) { o = document.createElement('option'); o.dataset.custom = '1'; z.appendChild(o); }
+  o.value = ui.zoom; o.textContent = Math.round(ui.scale * 100) + '%'; z.value = ui.zoom;
+}
 document.addEventListener('pointerdown', e => {
   if (ui.view !== 'editor') return;
   const lib = e.target.closest('.libitem'); if (lib) return libDown(e, lib);
+  if (qs && !e.target.closest('.qschip')) clearQS();
+  if (e.pointerType === 'touch' && e.target.closest('#stage') && !e.target.closest('#sktools')) {
+    if (ui.drawing === 'pen') { e.preventDefault(); return; }   // palm resting while the Pencil draws
+    touches.set(e.pointerId, { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY });
+    if (touches.size === 2) { startGesture(); e.preventDefault(); return; }
+    if (touches.size > 2) { if (gesture) gesture.max = Math.max(gesture.max, touches.size); e.preventDefault(); return; }
+  }
+  if (e.pointerType === 'pen' && dragCancel) dragCancel();   // a palm that landed first must not keep dragging
   const page = e.target.closest('#page');
   if (!page) { if (e.target.closest('#stage') && !e.target.closest('#sktools')) clearSel(); return; }
-  if (e.pointerType === 'touch' && ui.sk.on) {
-    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (touches.size === 2) { if (strokeCancel) strokeCancel(); gesture = { t: Date.now(), moved: false }; e.preventDefault(); return; }
-    if (touches.size > 2) { e.preventDefault(); return; }
-  }
   if (ui.drawing) { if (e.pointerType === 'touch') e.preventDefault(); return; }
-  const penDraw = e.pointerType === 'pen' && cur().pencilDraws === true && ui.mode === 'wf';
-  if ((ui.sk.on || penDraw) && e.button === 0 && !e.target.closest('textarea,.nhead button,.vhdr')) return sketchDown(e, page);
+  // Sketch mode: the Pencil and a mouse draw, a finger edits (unless fingerDraws). Outside it only pencilDraws draws.
+  const o = cur(), kind = e.pointerType;
+  const draws = ui.mode === 'wf' && e.button === 0 && (kind === 'pen' ? (ui.sk.on || o.pencilDraws === true) : kind === 'touch' ? (ui.sk.on && o.fingerDraws === true) : ui.sk.on);
+  if (draws && !e.target.closest('textarea,.nhead button,.vhdr')) return sketchDown(e, page);
   const el = e.target.closest('.vis[data-id]');
   if (!el) { clearSel(); return; }
   if (e.target.closest('button,textarea,.back') || e.button !== 0) return;
@@ -824,7 +851,13 @@ document.addEventListener('pointerdown', e => {
       group.forEach(g => { g.v.x = g.x + mx; g.v.y = g.y + my; if (g.el) { g.el.style.left = g.v.x + 'px'; g.el.style.top = g.v.y + 'px'; } });
     } else { v.x = clamp(snapV(st.vx + dx), 0, pw() - v.w); v.y = clamp(snapV(st.vy + dy), 0, ph() - v.h); el.style.left = v.x + 'px'; el.style.top = v.y + 'px'; }
   };
+  dragCancel = () => {
+    dragCancel = null; el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.classList.remove('dragging');
+    try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (moved) { if (group) group.forEach(g => { g.v.x = g.x; g.v.y = g.y; }); else Object.assign(v, { x: st.vx, y: st.vy, w: st.vw, h: st.vh }); renderPage(); }
+  };
   const up = () => {
+    dragCancel = null;
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.classList.remove('dragging');
     if (moved) { if (resize || cur().notesMode === 'side' || ui.dropOpen === v.id) renderPage(); save(); return; }
     if (group) ui.multi.clear();
@@ -833,7 +866,10 @@ document.addEventListener('pointerdown', e => {
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 });
 document.addEventListener('pointermove', e => {
-  if (e.pointerType === 'touch' && touches.has(e.pointerId) && gesture) { const t = touches.get(e.pointerId); if (Math.hypot(e.clientX - t.x, e.clientY - t.y) > 12) gesture.moved = true; }
+  if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+    const t = touches.get(e.pointerId); t.x = e.clientX; t.y = e.clientY;
+    if (gesture) { if (Math.hypot(t.x - t.x0, t.y - t.y0) > 12) gesture.moved = true; if (gesture.moved && gesture.max === 2 && touches.size === 2) pinch(); }
+  }
   const tip = $('#tip');
   if (ui.view !== 'editor' || ui.drawing || ui.sk.on) { tip.hidden = true; return; }
   const t = e.target.closest && e.target.closest('.front [data-i]'), el = t && t.closest('.vis[data-id]');
@@ -848,10 +884,12 @@ document.addEventListener('pointermove', e => {
 const touchEnd = e => {
   if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
   touches.delete(e.pointerId);
-  if (gesture && touches.size === 0) { if (!gesture.moved && Date.now() - gesture.t < 450) skUndo(); gesture = null; }
+  if (gesture && touches.size === 0) { if (!gesture.moved && Date.now() - gesture.t < 450 && ui.sk.on) { if (gesture.max >= 3) skRedo(); else skUndo(); } gesture = null; }
 };
 // iPad Safari can still pan the stage under touch-action:none, which cancels the drag. Block the native pan on visuals and while drawing.
-document.addEventListener('touchmove', e => { if (ui.view === 'editor' && (ui.drawing || (e.target.closest && e.target.closest('#page .vis[data-id]') && !e.target.closest('textarea')))) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', e => { if (ui.view === 'editor' && (ui.drawing || (e.touches && e.touches.length > 1 && e.target.closest && e.target.closest('#stage')) || (e.target.closest && e.target.closest('#page .vis[data-id]') && !e.target.closest('textarea')))) e.preventDefault(); }, { passive: false });
+// Safari's own pinch would zoom the whole app instead of the canvas
+document.addEventListener('gesturestart', e => { if (ui.view === 'editor') e.preventDefault(); });
 document.addEventListener('pointerup', touchEnd); document.addEventListener('pointercancel', touchEnd);
 function clickVisual(v, target) {
   const now = Date.now();
@@ -892,8 +930,8 @@ function libDown(e, b) {
 
 /* ---------- sketch ---------- */
 function pathD(pts) { const f = n => n.toFixed(1); if (pts.length < 2) return `M${f(pts[0][0])} ${f(pts[0][1])}l0.01 0`; let d = `M${f(pts[0][0])} ${f(pts[0][1])}`; for (let i = 1; i < pts.length - 1; i++) d += `Q${f(pts[i][0])} ${f(pts[i][1])} ${f((pts[i][0] + pts[i + 1][0]) / 2)} ${f((pts[i][1] + pts[i + 1][1]) / 2)}`; const l = pts[pts.length - 1]; return d + `L${f(l[0])} ${f(l[1])}`; }
-function outlinePath(pts, w, press, taper) {
-  const [lo, hi] = press, f = n => n.toFixed(1), n = pts.length, rad = i => { let r = w * (lo + (hi - lo) * (pts[i][2] ?? .5)) / 2; if (taper) { const t = Math.min(i, n - 1 - i); r *= Math.min(1, .2 + t / 6); } return Math.max(.35, r); };
+function outlinePath(pts, w, press, taper, tilt = 0) {
+  const [lo, hi] = press, f = n => n.toFixed(1), n = pts.length, rad = i => { let r = w * (lo + (hi - lo) * (pts[i][2] ?? .5)) / 2 * (1 + (pts[i][3] || 0) * tilt); if (taper) { const t = Math.min(i, n - 1 - i); r *= Math.min(1, .2 + t / 6); } return Math.max(.35, r); };
   if (n < 2) { const r = rad(0), [x, y] = pts[0]; return `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`; }
   const L = [], R = [];
   for (let i = 0; i < n; i++) {
@@ -908,41 +946,125 @@ function outlinePath(pts, w, press, taper) {
   return d + `A${f(rS)} ${f(rS)} 0 0 0 ${f(L[0][0])} ${f(L[0][1])}Z`;
 }
 function strokeSVG(s) {
+  if (s.fill) return `<g><path d="${pathD(s.pts)}Z" fill="${s.fill}"/>${strokeSVG({ ...s, fill: null })}</g>`;
   const T = TOOLS[s.tool] || TOOLS.pen;
   if (!T.press) return `<path d="${pathD(s.pts)}" stroke="${s.c}" stroke-width="${s.w}" fill="none" stroke-linecap="${T.cap || 'round'}" stroke-linejoin="round" opacity="${T.op}"${s.tool === 'marker' ? ' style="mix-blend-mode:multiply"' : ''}/>`;
-  return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper)}" fill="${s.c}" opacity="${T.op}"/>`;
+  return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${T.op}"/>`;
 }
 function redrawSketch() { const svg = $('#sketch'); if (svg) svg.innerHTML = (pg().sketch || []).map(strokeSVG).join(''); }
 function pushUndo() { const o = cur(); ui.skUndo.push(clone(pg().sketch || [])); if (ui.skUndo.length > 60) ui.skUndo.shift(); ui.skRedo = []; }
 function skUndo() { if (!ui.skUndo.length) return; const o = cur(); ui.skRedo.push(clone(pg().sketch || [])); pg().sketch = ui.skUndo.pop(); redrawSketch(); renderSkTools(); save(); }
 function skRedo() { if (!ui.skRedo.length) return; const o = cur(); ui.skUndo.push(clone(pg().sketch || [])); pg().sketch = ui.skRedo.pop(); redrawSketch(); renderSkTools(); save(); }
+// 0 while the Pencil is at writing angle or steeper, rising to 1 as it lies flat. Safari reports either
+// altitudeAngle or tiltX/tiltY; a browser that only knows tilt reports altitude as straight up.
+const TILT_FROM = 50 * Math.PI / 180;
+function tiltOf(ev) {
+  if (ev.pointerType !== 'pen') return 0;
+  let a = ev.altitudeAngle;
+  if (a == null || (a >= Math.PI / 2 - 1e-6 && (ev.tiltX || ev.tiltY))) { const tx = Math.tan((ev.tiltX || 0) * Math.PI / 180), ty = Math.tan((ev.tiltY || 0) * Math.PI / 180); a = Math.atan2(1, Math.hypot(tx, ty)); }
+  return clamp((TILT_FROM - a) / TILT_FROM, 0, 1);
+}
+/* ---------- QuickShape ---------- */
+let qs = null;
+function densify(list, step = 6) {
+  const out = [list[0]];
+  for (let i = 1; i < list.length; i++) { const [ax, ay] = list[i - 1], [bx, by] = list[i], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step)); for (let k = 1; k <= n; k++) out.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]); }
+  return out;
+}
+// A held stroke becomes a straight line, a rectangle (axis-aligned, for wireframes) or an ellipse; anything else stays as drawn.
+function quickShape(pts) {
+  const P = pts.map(p => [p[0], p[1]]), n = P.length; if (n < 5) return null;
+  let L = 0; for (let i = 1; i < n; i++) L += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+  if (L < 30) return null;
+  const avg = k => pts.reduce((t, p) => t + (p[k] || 0), 0) / n, pr = +avg(2).toFixed(2), tl = +avg(3).toFixed(2);
+  const mk = list => list.map(([x, y]) => tl ? [+x.toFixed(1), +y.toFixed(1), pr, tl] : [+x.toFixed(1), +y.toFixed(1), pr]);
+  const [sx, sy] = P[0], [ex, ey] = P[n - 1], chord = Math.hypot(ex - sx, ey - sy);
+  if (chord / L > .92) return { kind: 'line', pts: mk(densify([[sx, sy], [ex, ey]])) };
+  const xs = P.map(p => p[0]), ys = P.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), w = x1 - x0, h = y1 - y0, diag = Math.hypot(w, h);
+  if (w < 20 || h < 20 || chord > .3 * Math.max(w, h)) return null;
+  const corner = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].reduce((t, [cx, cy]) => t + Math.min(...P.map(([x, y]) => Math.hypot(x - cx, y - cy))), 0) / 4 / diag;
+  const rErr = P.reduce((t, [x, y]) => t + Math.min(Math.abs(x - x0), Math.abs(x - x1), Math.abs(y - y0), Math.abs(y - y1)), 0) / n / Math.min(w, h);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, eErr = P.reduce((t, [x, y]) => t + Math.abs(Math.hypot((x - cx) / (w / 2), (y - cy) / (h / 2)) - 1), 0) / n;
+  if (corner < .08 && rErr < .08) return { kind: 'rect', pts: mk(densify([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]])) };
+  if (eErr < .14) return { kind: 'ellipse', pts: mk(Array.from({ length: 73 }, (_, i) => [cx + w / 2 * Math.cos(i / 72 * 2 * Math.PI), cy + h / 2 * Math.sin(i / 72 * 2 * Math.PI)])) };
+  return null;
+}
+// Fill: a QuickShape rectangle or ellipse, or any freehand outline whose ends meet, counts as closed.
+function closedStroke(s) {
+  if (s.shape === 'rect' || s.shape === 'ellipse') return true;
+  const P = s.pts; if (P.length < 8) return false;
+  const xs = P.map(p => p[0]), ys = P.map(p => p[1]), w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  return w > 15 && h > 15 && Math.hypot(P[0][0] - P.at(-1)[0], P[0][1] - P.at(-1)[1]) < Math.max(12, .15 * Math.max(w, h));
+}
+function inside(P, x, y) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) if ((P[i][1] > y) !== (P[j][1] > y) && x < (P[j][0] - P[i][0]) * (y - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; return c; }
+// Fills the topmost closed drawing under the tap; the same colour again clears it.
+function fillAt(x, y) {
+  const list = pg().sketch || [], s = [...list].reverse().find(k => k.tool !== 'eraser' && closedStroke(k) && inside(k.pts, x, y));
+  if (!s) { toast('Tap inside a closed shape to fill it'); return; }
+  pushUndo(); s.fill = s.fill === ui.sk.color ? null : ui.sk.color; if (!s.fill) delete s.fill;
+  redrawSketch(); renderSkTools(); save();
+}
+function clearQS() { if (!qs) return; clearTimeout(qs.t); qs.el.remove(); qs = null; }
+function showQS(s) {
+  clearQS();
+  const xs = s.pts.map(p => p[0]), ys = s.pts.map(p => p[1]), box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  const r = $('#page').getBoundingClientRect(), el = document.createElement('div');
+  el.className = 'qschip'; el.innerHTML = `<button data-act="qsmake">${I.column}Make visual</button>`;
+  el.style.left = clamp(r.left + box.x * ui.scale, 8, innerWidth - 200) + 'px'; el.style.top = clamp(r.top + box.y * ui.scale - 56, 8, innerHeight - 60) + 'px';
+  document.body.appendChild(el); qs = { s, box, el, t: setTimeout(clearQS, 8000) };
+}
+function qsMenu() {
+  if (!qs) return; clearTimeout(qs.t); qs.t = setTimeout(clearQS, 20000);
+  qs.el.innerHTML = `<span class="lab">Make this a</span>${Object.entries(TYPES).map(([k, t]) => `<button data-act="qstype" data-type="${k}" aria-label="${t.name}" title="${t.name}">${I[k]}</button>`).join('')}<button data-act="qsclose" aria-label="Keep the drawing">${I.x}</button>`;
+}
+function qsMake(type) {
+  if (!qs) return;
+  const { s, box } = qs, w = clamp(snapV(box.w), 30, pw()), h = clamp(snapV(box.h), 30, ph());
+  const v = mkV(type, clamp(snapV(box.x), 0, pw() - w), clamp(snapV(box.y), 0, ph() - h), w, h, {}, model());
+  pg().visuals.push(v); pg().sketch = pg().sketch.filter(x => x !== s); clearQS();
+  renderPage(); renderSkTools(); openSheet(v.id); save();
+}
 function sketchDown(e, page) {
   e.preventDefault(); const o = cur(); pg().sketch = pg().sketch || []; $('#tip').hidden = true;
   if (o.showSketch === false) { o.showSketch = true; $('#sketch').style.display = ''; const t = $('[data-k=showSketch]'); if (t) t.checked = true; }
   const tool = (ui.sk.on || e.pointerType !== 'pen') ? ui.sk.tool : (ui.sk.tool), T = TOOLS[tool], rect = page.getBoundingClientRect();
-  const rawPt = ev => [(ev.clientX - rect.left) / ui.scale, (ev.clientY - rect.top) / ui.scale, ev.pointerType === 'pen' ? (ev.pressure || .5) : .5];
-  pushUndo(); ui.drawing = true; page.setPointerCapture(e.pointerId);
-  let mv, s = null, path = null, changed = false, last = null, cancelled = false;
+  const rawPt = ev => [(ev.clientX - rect.left) / ui.scale, (ev.clientY - rect.top) / ui.scale, ev.pointerType === 'pen' ? (ev.pressure || .5) : .5, tiltOf(ev)];
+  clearQS();
+  if (tool === 'fill') { const [x, y] = rawPt(e); fillAt(x, y); return; }
+  pushUndo(); ui.drawing = e.pointerType; page.setPointerCapture(e.pointerId);
+  let mv, s = null, path = null, changed = false, last = null, cancelled = false, hold = null, snapped = false, lastRaw = null;
   const size = ui.sk.size[tool];
   if (tool === 'eraser') {
     mv = ev => { const [x, y] = rawPt(ev), n = pg().sketch.length, r = size / 2 + 4; pg().sketch = pg().sketch.filter(st => !st.pts.some(p => Math.hypot(p[0] - x, p[1] - y) < r + (st.w || 2) / 2)); if (pg().sketch.length !== n) { changed = true; redrawSketch(); } };
     mv(e);
   } else {
-    const smooth = ev => { const p = rawPt(ev); if (!last) { last = p; return p; } const k = 1 - stabOf(tool) / 100; last = [last[0] + (p[0] - last[0]) * k, last[1] + (p[1] - last[1]) * k, last[2] + (p[2] - last[2]) * .5]; return last; };
+    const smooth = ev => { const p = rawPt(ev); if (!last) { last = p; return p; } const k = 1 - stabOf(tool) / 100; last = [last[0] + (p[0] - last[0]) * k, last[1] + (p[1] - last[1]) * k, last[2] + (p[2] - last[2]) * .5, last[3] + (p[3] - last[3]) * .5]; return last; };
+    // QuickShape: holding still for 550 ms snaps the stroke; small jitter does not restart the wait
+    const armHold = () => { clearTimeout(hold); hold = setTimeout(() => { const sh = quickShape(lastRaw ? [...s.pts, lastRaw] : s.pts); if (sh) { s.pts = sh.pts; s.shape = sh.kind; snapped = true; draw(); } }, 550); };
     s = { tool, c: ui.sk.color, w: size, pts: [smooth(e)] };
     path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); $('#sketch').appendChild(path);
     const draw = () => { const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'g'); tmp.innerHTML = strokeSVG(s); const np = tmp.firstChild; path.replaceWith(np); path = np; };
-    mv = ev => { let list = ev.getCoalescedEvents ? ev.getCoalescedEvents() : []; if (!list.length) list = [ev]; for (const c of list) { const p = smooth(c), l = s.pts[s.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) >= .8) s.pts.push(p); } draw(); };
+    mv = ev => {
+      if (snapped) return;
+      let list = ev.getCoalescedEvents ? ev.getCoalescedEvents() : []; if (!list.length) list = [ev]; for (const c of list) { const p = smooth(c), l = s.pts[s.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) >= .8) s.pts.push(p); } draw();
+      const raw = rawPt(ev); if (!lastRaw || Math.hypot(raw[0] - lastRaw[0], raw[1] - lastRaw[1]) > 4) { lastRaw = raw; armHold(); }
+    };
     draw();
   }
   strokeCancel = () => { cancelled = true; if (path) path.remove(); finish(); ui.skUndo.pop(); };
-  const finish = () => { page.removeEventListener('pointermove', mv); page.removeEventListener('pointerup', up); page.removeEventListener('pointercancel', up); ui.drawing = false; strokeCancel = null; };
+  const finish = () => { clearTimeout(hold); page.removeEventListener('pointermove', mv); page.removeEventListener('pointerup', up); page.removeEventListener('pointercancel', up); ui.drawing = false; strokeCancel = null; };
   const up = ev => {
     finish();
     if (cancelled) return;
-    if (s) { const raw = rawPt(ev); if (s.pts.length > 1 && Math.hypot(raw[0] - s.pts[s.pts.length - 1][0], raw[1] - s.pts[s.pts.length - 1][1]) > .8) s.pts.push([raw[0], raw[1], s.pts[s.pts.length - 1][2]]); s.pts = s.pts.map(p => [+p[0].toFixed(1), +p[1].toFixed(1), +(+p[2]).toFixed(2)]); pg().sketch.push(s); changed = true; }
+    if (s) {
+      const raw = rawPt(ev), lp = s.pts[s.pts.length - 1];
+      if (!snapped && s.pts.length > 1 && Math.hypot(raw[0] - lp[0], raw[1] - lp[1]) > .8) s.pts.push([raw[0], raw[1], lp[2], lp[3]]);
+      s.pts = s.pts.map(p => p[3] > .005 ? [+p[0].toFixed(1), +p[1].toFixed(1), +(+p[2]).toFixed(2), +p[3].toFixed(2)] : [+p[0].toFixed(1), +p[1].toFixed(1), +(+p[2]).toFixed(2)]);
+      pg().sketch.push(s); changed = true;
+    }
     if (!changed) ui.skUndo.pop();
     renderSkTools(); save();
+    if (s && s.shape === 'rect') showQS(s);
   };
   page.addEventListener('pointermove', mv); page.addEventListener('pointerup', up); page.addEventListener('pointercancel', up);
 }
@@ -956,7 +1078,8 @@ function renderSkTools() {
   <span class="sep"></span>${SK_COLOURS.map(([c, l]) => `<button data-act="skcolor" data-val="${c}" aria-pressed="${ui.sk.color === c}" aria-label="${l}"><span class="dot" style="background:${c}"></span></button>`).join('')}
   <span class="sep"></span><button data-act="skundo" aria-label="Undo" ${ui.skUndo.length ? '' : 'disabled'}>${I.undo}</button><button data-act="skredo" aria-label="Redo" ${ui.skRedo.length ? '' : 'disabled'}>${I.redo}</button><button data-act="skclear" ${(pg().sketch || []).length ? '' : 'disabled'}>Clear</button>
   <span class="sep"></span><button class="primary" data-act="sketch">Done</button></div>
-  ${ui.sk.pop ? `<div class="weights"><span class="lab">${T.label} size</span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;height:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}
+  ${ui.sk.pop && t === 'fill' ? '<div class="weights"><span class="lab">Tap inside a closed shape to fill it with the chosen colour. Tap it again with the same colour to clear the fill.</span></div>' : ''}
+  ${ui.sk.pop && t !== 'fill' ? `<div class="weights"><span class="lab">${T.label} size</span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;height:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}
   ${t === 'eraser' ? '' : `<span class="sep"></span><label class="stab"><span class="lab">Stability</span><input type="range" min="0" max="90" step="5" data-skstab value="${stabOf(t)}" aria-label="${T.label} stability"><output>${stabOf(t)}</output></label>`}</div>` : ''}</div>`;
 }
 
@@ -1125,7 +1248,10 @@ document.addEventListener('click', e => {
     case 'theme': themeDialog(); break;
     case 'dljson': download(`${(ui.mode === 'tpl' ? o.client : (tplOf(o)?.client || o.name)).replace(/[^\w -]/g, '')} theme.json`, themeJSON(), 'application/json'); break;
     case 'copyjson': { const t = $('#themeTxt'); const done = () => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1600); }; (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(done).catch(() => { t.select(); try { document.execCommand('copy'); done(); } catch (_) { b.textContent = 'Select and copy'; } }); break; }
-    case 'sketch': ui.sk.on = !ui.sk.on; ui.sk.pop = false; ui.multi.clear(); setSel(null); if (ui.panel === 'visual') { ui.panel = 'tab'; renderPanel(); } renderSkTools(); renderPage(); break;
+    case 'qsmake': qsMenu(); break;
+    case 'qstype': qsMake(b.dataset.type); break;
+    case 'qsclose': clearQS(); break;
+    case 'sketch': clearQS(); ui.sk.on = !ui.sk.on; ui.sk.pop = false; ui.multi.clear(); setSel(null); if (ui.panel === 'visual') { ui.panel = 'tab'; renderPanel(); } renderSkTools(); renderPage(); break;
     case 'sktool': { const t = b.dataset.val; if (ui.sk.tool === t) ui.sk.pop = !ui.sk.pop; else { ui.sk.tool = t; ui.sk.pop = true; } renderSkTools(); break; }
     case 'skcolor': ui.sk.color = b.dataset.val; if (ui.sk.tool === 'eraser') ui.sk.tool = 'pencil'; renderSkTools(); break;
     case 'skw': ui.sk.size[ui.sk.tool] = +b.dataset.val; ui.sk.pop = false; renderSkTools(); break;
@@ -1213,7 +1339,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'zoom') { ui.zoom = t.value; fit(); return; }
+  if (t.id === 'zoom') { ui.zoom = t.value; fit(); syncZoom(); return; }
   if (t.dataset.cs) { const s = cur().settings, k = t.dataset.cs; if (k === 'preset') { if (t.value !== 'custom') setSize(...t.value.split('x').map(Number)); return; } if (t.value === '') return; setSize(k === 'w' ? +t.value : s.pageW, k === 'h' ? +t.value : s.pageH); return; }
   const f = t.files && t.files[0]; if (!f) return;
   const r = new FileReader();

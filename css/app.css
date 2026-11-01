@@ -67,7 +67,7 @@ h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .libitem:hover{background:var(--surface-2);border-color:var(--line)}
 .lib .hint{margin:12px 8px 0}
 .mid{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
-.stage{overflow:auto;padding:20px;position:relative;min-width:0;flex:1;min-height:0}
+.stage{overflow:auto;padding:20px;position:relative;min-width:0;flex:1;min-height:0;touch-action:none}
 .pagetabs{flex:none;display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--surface);border-top:1px solid var(--line);overflow-x:auto}
 .ptab{display:flex;align-items:center;flex:none;border-radius:8px}
 .ptab>button:first-child{border:0;background:none;color:var(--ink-2);font-weight:500;padding:6px 12px;white-space:nowrap}
@@ -217,7 +217,6 @@ h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 .sketch{position:absolute;left:0;top:0;z-index:30;pointer-events:none;overflow:visible}
 .page.sketching,.page.sketching .vis{cursor:crosshair}
-.page.sketching .vrs,.page.sketching .vhdr{display:none}
 .sktools{position:sticky;top:0;left:0;z-index:10;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;margin:0 auto 14px;width:max-content;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .sktools button{min-height:44px;min-width:44px;padding:0 10px}
 .sktools button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent)}
@@ -322,3 +321,6 @@ dialog::backdrop{background:rgba(20,24,28,.45)}
 .arrange button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
 .arrange .sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
 .arrange .acount{font-size:13px;color:var(--ink-2);padding:0 6px;white-space:nowrap}
+.qschip{position:fixed;z-index:60;display:flex;align-items:center;gap:4px;flex-wrap:wrap;max-width:min(92vw,620px);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.qschip button{min-height:44px;min-width:44px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.qschip .lab{font-size:13px;color:var(--ink-2);padding:0 6px}
