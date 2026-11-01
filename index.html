@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DataSketch</title>
+<meta name="description" content="Wireframe Power BI reports with realistic fake data, client page layouts, bookmarks and Apple Pencil sketching.">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1E2226" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DataSketch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="alternate icon" href="icons/favicon.ico">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app"><div class="loading">Loading DataSketch…</div></div>
+<div id="tip" class="tip" hidden></div>
+<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+<noscript><p style="padding:24px">DataSketch needs JavaScript turned on.</p></noscript>
+<script type="module" src="js/app.js"></script>
+<script nomodule>document.getElementById('app').innerHTML='<p style="padding:24px">This browser is too old for DataSketch. Please use a current version of Safari, Chrome or Edge.</p>';</script>
+</body>
+</html>

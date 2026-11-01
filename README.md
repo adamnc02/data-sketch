@@ -1,0 +1,110 @@
+# DataSketch
+
+Wireframes for Power BI reports, made in client requirement sessions on an iPad with Apple Pencil or on a
+desktop. Visuals look like Power BI natives and are filled from a realistic, internally consistent fake data
+model, so clients react to the layout and the story rather than to real numbers. Client templates carry a
+client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
+
+Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
+made to be added to an iPad Home Screen. **Status: 1.0.0.**
+
+## Stack
+
+Plain HTML, CSS and native ES modules. **No framework, no bundler, no npm, no CDN scripts and no build
+step**: the files in this repo are what the browser runs. All data stays on the device (IndexedDB, with a
+`localStorage` fallback); nothing is sent to a server. A service worker caches the app so it works
+offline once loaded.
+
+## What it does
+
+- **Home:** wireframes and client templates as cards with thumbnails. New wireframe picks a template and a
+  starting data model (the sample model or a copy of another wireframe's). **Export** and **Import** each ask
+  what kind: a full backup, one client template, or one wireframe.
+- **Client templates:** styling (colours, theme palette, font, corners, borders, shadows, data labels and the
+  rest), canvas size, and a page layout built from shapes, text boxes, images and buttons. Wireframes copy
+  the styling and canvas size when created (Apply copies them again) and show the template's layout live,
+  locked, behind their visuals.
+- **Canvas:** presets from 16:9 to Letter and Tooltip, or a custom size; Fit, 100, 75 and 50% zoom; a grid
+  with snap; drag from the library or tap to add; move and resize from every edge.
+- **Visuals:** card, column, bar, line, area, donut, table, slicer (list, dropdown, tiles, date range, field
+  parameter), button, shape, text box and image. With a visual selected, tapping another type in the
+  library changes it after a confirmation. The library collapses to icons.
+- **Multi-select:** Ctrl, Cmd or Shift + click, or **Select multiple** in the arrange bar on touch. Align
+  left, centre, right, top, middle or bottom; distribute horizontally or vertically; drag the group.
+- **Pages:** a tab strip under the canvas. Each page has its own visuals, bookmarks and sketches; styling,
+  grid and the data model are shared.
+- **Interactivity:** cross-highlighting from bars, rows and slicers, tooltips, date drill, bookmarks with
+  per-visual scope (Shown, Hidden, Not affected) linked to buttons.
+- **Notes:** double-click a visual to flip it and type notes; show them on flip, all at once, or alongside
+  the page as numbered pins.
+- **Data tab:** measures (type, format, size, trend, strength, seasonality and stories such as "top
+  performer"), dimensions and member names, currency, regenerate values, and export of a star schema as
+  CSVs with matching DAX measures.
+- **Sketch:** the **Sketch** button switches Apple Pencil from editing (select, move, resize) to drawing.
+  Pencil, pen, brush, highlighter and eraser, pressure-sensitive, with undo, redo and two-finger-tap undo.
+- **Theme JSON:** a Power BI theme file from the current styling, to copy or download.
+
+## Rules that must not be quietly undone
+
+### Every path is relative.
+GitHub Pages serves the app from `/data-sketch/`. `css/app.css` and `./` work; `/css/app.css` breaks the
+live app while working on localhost.
+
+### Every release bumps `VERSION` in `sw.js` and `APP_VERSION` in `js/app.js`.
+The service worker serves every file from its cache. Without a new `VERSION`, installed copies keep
+running the old files and never offer the update.
+
+### A file the app needs is listed in `ASSETS` in `sw.js`.
+Anything missing from the list is not available offline.
+
+### Every new stored field has a default in `vDefaults()`, `BASE` or `normalize()`.
+Stores, backups and exports from earlier versions load through `normalize()`. A field without a default is
+`undefined` in old data.
+
+### Visuals, bookmarks and sketches are read through `pg()`, never `cur()`.
+They belong to the active page of a wireframe. `cur()` is the wireframe or template; `pg()` is its page (a
+template is its own single page).
+
+### The canvas size is read through `pw()` and `ph()`.
+It lives in each template's and wireframe's settings. There is no fixed page size in the code.
+
+### Trend, seasonality and stories live on the measure, never on a visual.
+Every visual of a measure then tells the same story and totals reconcile across visuals.
+
+### Destructive actions confirm with a second tap (`arm()`), never `confirm()`.
+Full-backup import confirms in its own dialog.
+
+### All user text goes through `esc()` before it is put into HTML.
+
+## Running it locally
+
+ES modules and the service worker need http, not `file://`. From the repo root:
+
+```
+python3 -m http.server 8765
+```
+
+Open `http://localhost:8765/`. To test on an iPad on the same Wi-Fi, use the Mac's LAN address
+(`http://<mac-ip>:8765/`). Plain http on a LAN address has no service worker or Add to Home Screen; test
+those on the live site.
+
+## Tests
+
+There is no automated test suite in the repo. Changes are checked by driving the app in Chromium with
+Playwright (service workers blocked so cached files can't hide a change), at desktop and iPad portrait
+(820 × 1180) sizes, and then on the iPad. `TECHNICAL.md` §13 lists the checks.
+
+## Deploying
+
+Merging to `main` deploys: GitHub Pages builds from the root of `main` (Settings → Pages → Deploy from a
+branch → `main` / `(root)`). `.nojekyll` makes Pages serve the files as they are. Bump `VERSION` and
+`APP_VERSION` first; open copies then show **"A new version of DataSketch is ready"** with an Update
+button.
+
+On the iPad: Safari → Share → **Add to Home Screen**. The Home Screen app keeps its data separately from
+Safari tabs, so Export a full backup and Import it when moving between them.
+
+## Documents
+
+- `README.md`: this file.
+- `TECHNICAL.md`: how the app is built, module by module, with the data shapes and file formats.
