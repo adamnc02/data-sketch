@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.0.1.**
+made to be added to an iPad Home Screen. **Status: 1.0.2.**
 
 ## Stack
 
@@ -43,6 +43,7 @@ offline once loaded.
   CSVs with matching DAX measures.
 - **Sketch:** the **Sketch** button switches Apple Pencil from editing (select, move, resize) to drawing.
   Pencil, pen, brush, highlighter and eraser, pressure-sensitive, with undo, redo and two-finger-tap undo.
+  Each drawing tool has its own sizes and a Stability slider (smoothing, 0–90), kept per device.
 - **Theme JSON:** a Power BI theme file from the current styling, to copy or download.
 
 ## Rules that must not be quietly undone

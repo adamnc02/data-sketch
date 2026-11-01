@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -68,6 +68,7 @@ const TOOLS = {
   marker: { label: 'Highlighter', sizes: [10, 16, 24, 34], press: null, smooth: .6, op: .35, cap: 'butt', icon: '<path d="M9 12l-5 5v3h3l5-5"/><path d="M8 11l7-7 5 5-7 7z"/>' },
   eraser: { label: 'Eraser', sizes: [10, 20, 36, 56], icon: '<path d="M8 20h12"/><path d="M4.5 14.5l9-9 6 6-7 7H9z"/>' }
 };
+const stabOf = t => ui.sk.stab[t] ?? Math.round((TOOLS[t].smooth || 0) * 100);
 const SK_COLOURS = [['#252423', 'Black'], ['#D13438', 'Red'], ['#1A66D9', 'Blue'], ['#107C10', 'Green'], ['#F2C80F', 'Yellow'], ['#FFFFFF', 'White']];
 
 /* ---------- storage ---------- */
@@ -102,7 +103,7 @@ function setSaved(t) { const el = $('#saved'); if (el) el.textContent = t; }
 /* ---------- model helpers ---------- */
 const ui = {
   mode: 'wf', view: 'home', wfId: null, sel: null, panel: 'tab', tab: 'settings', panelOpen: false, flipped: new Set(), hl: null, hlBefore: null, last: null,
-  zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, pop: false },
+  zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, stab: {}, pop: false },
   skUndo: [], skRedo: [], drawing: false, ghost: false, paramSel: {}, slicerSel: {}, dropOpen: null, bmOpen: null, mOpen: null, vdata: new Map(), exportCache: null
 };
 const cur = () => ui.mode === 'tpl' ? store.templates.find(t => t.id === ui.wfId) : store.wireframes.find(w => w.id === ui.wfId);
@@ -478,6 +479,7 @@ function openWf(id, mode = 'wf') {
   ui.sk.on = false; ui.sk.pop = false; ui.vdata.clear();
   const o = cur(), T_ = mode === 'tpl';
   ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
+  try { ui.sk.stab = JSON.parse(localStorage.getItem('datasketch-stability') || '{}') || {}; } catch (e) { ui.sk.stab = {}; }
   try { ui.libMin = localStorage.getItem('datasketch-libmin') === '1'; ui.panelMin = localStorage.getItem('datasketch-panelmin') === '1'; } catch (e) {}
   const tn = T_ ? 'Client template' : tplOf(o)?.client;
   $('#app').innerHTML = `<header class="bar"><button class="ghost" data-act="home">${I.back}Wireframes</button>
@@ -926,7 +928,7 @@ function sketchDown(e, page) {
     mv = ev => { const [x, y] = rawPt(ev), n = pg().sketch.length, r = size / 2 + 4; pg().sketch = pg().sketch.filter(st => !st.pts.some(p => Math.hypot(p[0] - x, p[1] - y) < r + (st.w || 2) / 2)); if (pg().sketch.length !== n) { changed = true; redrawSketch(); } };
     mv(e);
   } else {
-    const smooth = ev => { const p = rawPt(ev); if (!last) { last = p; return p; } const k = 1 - T.smooth; last = [last[0] + (p[0] - last[0]) * k, last[1] + (p[1] - last[1]) * k, last[2] + (p[2] - last[2]) * .5]; return last; };
+    const smooth = ev => { const p = rawPt(ev); if (!last) { last = p; return p; } const k = 1 - stabOf(tool) / 100; last = [last[0] + (p[0] - last[0]) * k, last[1] + (p[1] - last[1]) * k, last[2] + (p[2] - last[2]) * .5]; return last; };
     s = { tool, c: ui.sk.color, w: size, pts: [smooth(e)] };
     path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); $('#sketch').appendChild(path);
     const draw = () => { const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'g'); tmp.innerHTML = strokeSVG(s); const np = tmp.firstChild; path.replaceWith(np); path = np; };
@@ -954,7 +956,8 @@ function renderSkTools() {
   <span class="sep"></span>${SK_COLOURS.map(([c, l]) => `<button data-act="skcolor" data-val="${c}" aria-pressed="${ui.sk.color === c}" aria-label="${l}"><span class="dot" style="background:${c}"></span></button>`).join('')}
   <span class="sep"></span><button data-act="skundo" aria-label="Undo" ${ui.skUndo.length ? '' : 'disabled'}>${I.undo}</button><button data-act="skredo" aria-label="Redo" ${ui.skRedo.length ? '' : 'disabled'}>${I.redo}</button><button data-act="skclear" ${(pg().sketch || []).length ? '' : 'disabled'}>Clear</button>
   <span class="sep"></span><button class="primary" data-act="sketch">Done</button></div>
-  ${ui.sk.pop ? `<div class="weights"><span class="lab">${T.label} size</span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;height:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}</div>` : ''}</div>`;
+  ${ui.sk.pop ? `<div class="weights"><span class="lab">${T.label} size</span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;height:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}
+  ${t === 'eraser' ? '' : `<span class="sep"></span><label class="stab"><span class="lab">Stability</span><input type="range" min="0" max="90" step="5" data-skstab value="${stabOf(t)}" aria-label="${T.label} stability"><output>${stabOf(t)}</output></label>`}</div>` : ''}</div>`;
 }
 
 /* ---------- clicks ---------- */
@@ -1137,6 +1140,7 @@ document.addEventListener('input', e => {
   const t = e.target, ds = t.dataset;
   if (!ui.view || ui.view !== 'editor') return;
   const o = cur();
+  if ('skstab' in ds) { ui.sk.stab[ui.sk.tool] = +t.value; const out = t.parentElement.querySelector('output'); if (out) out.textContent = t.value; try { localStorage.setItem('datasketch-stability', JSON.stringify(ui.sk.stab)); } catch (e) {} return; }
   if ('notes' in ds) {
     const v = findV(ds.notes); v.notes = t.value;
     const front = t.closest('.vis')?.querySelector('.front');

@@ -53,7 +53,8 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
   store. Call it after every change to persisted state. The top bar shows Saving…, Saved, or "Not saved:
   storage unavailable".
 - Per-device preferences: `localStorage` keys `datasketch-libmin` (`'1'` when the visuals library is
-  collapsed) and `datasketch-panelmin` (`'1'` when the right panel is hidden). Read and written inside
+  collapsed), `datasketch-panelmin` (`'1'` when the right panel is hidden) and `datasketch-stability` (JSON,
+  stability per sketch tool, for example `{"pencil":45}`). Read and written inside
   `try`.
 
 ## 3. State
@@ -62,7 +63,7 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
 - `ui` (transient): `mode` (`'wf'` wireframe or `'tpl'` template), `view` (`'home' | 'editor'`), `wfId`,
   `sel` (selected visual id), `panelMin` (right panel hidden), `multi` (set of ids when several are selected), `multiMode` (Select multiple
   toggle), `panel` / `tab` / `panelOpen`, `zoom` / `scale`, `libMin`, `flipped` (notes), `hl`
-  (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes),
+  (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes, `stab` stability per tool),
   `skUndo` / `skRedo`, `drawing`, `ghost` (show hidden visuals faintly), `vdata` (computed visual data for
   tooltips), `exportCache`.
 - `cur()` is the wireframe or template being edited. `pg()` is the active page: the wireframe page whose id
@@ -227,8 +228,15 @@ the template's settings, including canvas size. The Layers tab can hide the temp
   Pencil, finger and mouse draw, the sketch toolbar shows, and the button is highlighted.
 - `pencilDraws` (Canvas tab, "Apple Pencil draws outside Sketch mode") makes the Pencil draw with Sketch
   off. Only `true` turns it on; missing means off.
-- Tools: pencil, pen, brush, highlighter, eraser. Tapping a tool selects it and shows its sizes; tapping it again hides them. Strokes are
-  pressure-sensitive outlines with smoothing (`getCoalescedEvents`) and brush tapering; the eraser removes
+- Tools: pencil, pen, brush, highlighter, eraser. Tapping a tool selects it and shows its sizes and, for
+  every tool but the eraser, a Stability slider (0–90, step 5). Tapping it again hides them. Strokes are
+  pressure-sensitive outlines built from `getCoalescedEvents` and brush-tapered.
+- Stability is an exponential moving average on the input points: each new point moves the stroke
+  `1 - stability / 100` of the way towards the pointer. `stabOf(tool)` reads `ui.sk.stab[tool]`, falling back
+  to the tool's built-in `smooth` (pencil 30, brush 50, pen and highlighter 60). At 90 the line trails the
+  pointer, so on lift the raw final point is added and the stroke still ends where the Pencil left the
+  screen. Dragging the slider updates `ui.sk.stab` without re-rendering the toolbar, so the slider keeps
+  the touch; the eraser removes
   whole strokes. Undo and redo stacks hold up to 60 states; a two-finger tap in Sketch mode undoes. Touches
   that arrive while a stroke is in progress are ignored (palm rejection).
 - Sketches belong to the page; Show sketches hides them without deleting.
@@ -271,7 +279,9 @@ Every import runs `normalize()`, so files from earlier versions (no pages, no ca
 
 Serve the repo over http and drive it with Playwright, service workers blocked, at desktop and iPad
 portrait (820 × 1180), in Chromium and in WebKit (layout differences such as the file-input overflow in §14
-only show in WebKit):
+only show in WebKit). Headless WebKit paints the turned-away notes side of every visual (it ignores
+`backface-visibility` in the 3D flip), so its screenshots show yellow notes cards with mirrored text; real
+Safari does not. Use WebKit for layout measurements, Chromium for how things look:
 
 - No page errors or console errors; home shows Operations and Northwind Logistics on a fresh store.
 - Open the wireframe; every panel tab renders; clicking bars highlights; bookmarks apply.
@@ -281,7 +291,9 @@ only show in WebKit):
 - Canvas size presets and custom values; visuals stay on the page.
 - Export each kind and import it back; a wrong-kind import explains itself; an old backup without pages
   still loads.
-- Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; undo.
+- Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; undo. Stability:
+  each tool shows its default, the eraser has none, the same zigzag at 90 is much shorter than at 0 and
+  still ends at the lift point, and the value survives a reload.
 - Light and dark logo; CSV export downloads.
 - Side panel hides and shows on wide screens; the panel never scrolls sideways (`scrollWidth` equals
   `clientWidth` on every tab and edit sheet, in WebKit).

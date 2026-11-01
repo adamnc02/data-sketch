@@ -1,6 +1,6 @@
 // DataSketch service worker
 // Bump VERSION on every deploy so installed copies pick up the new files.
-const VERSION = 'datasketch-1.0.1';
+const VERSION = 'datasketch-1.0.2';
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css', 'js/app.js', 'js/data.js',
   'icons/favicon.svg', 'icons/favicon.ico', 'icons/favicon-16.png', 'icons/favicon-32.png', 'icons/apple-touch-icon.png',
