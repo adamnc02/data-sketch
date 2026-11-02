@@ -53,7 +53,8 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
   store. Call it after every change to persisted state. The top bar shows Saving…, Saved, or "Not saved:
   storage unavailable".
 - Per-device preferences: `localStorage` keys `datasketch-libmin` (`'1'` when the visuals library is
-  collapsed), `datasketch-panelmin` (`'1'` when the right panel is hidden) and `datasketch-stability` (JSON,
+  collapsed), `datasketch-panelmin` (`'1'` when the right panel is hidden), `datasketch-skpin` (`'1'` when the sketch
+  toolbar's brushes are pinned open) and `datasketch-stability` (JSON,
   stability per sketch tool, for example `{"pencil":45}`). Read and written inside
   `try`.
 
@@ -63,7 +64,8 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
 - `ui` (transient): `mode` (`'wf'` wireframe or `'tpl'` template), `view` (`'home' | 'editor'`), `wfId`,
   `sel` (selected visual id), `panelMin` (right panel hidden), `multi` (set of ids when several are selected), `multiMode` (Select multiple
   toggle), `panel` / `tab` / `panelOpen`, `zoom` / `scale`, `libMin`, `flipped` (notes), `hl`
-  (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes, `stab` stability per tool),
+  (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes, `stab` stability per tool, `open` / `pinned` brushes row, `prev` tool for
+  the eraser swap),
   `skUndo` / `skRedo`, `drawing`, `ghost` (show hidden visuals faintly), `vdata` (computed visual data for
   tooltips), `exportCache`.
 - `cur()` is the wireframe or template being edited. `pg()` is the active page: the wireframe page whose id
@@ -150,6 +152,8 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
 - The right panel (`renderPanel()`) shows the visual edit sheet or the tabs Canvas, Layers, Bookmarks and
   Data (templates show Canvas and Layers). Text inputs never re-render the panel, so focus stays; selects
   and switches re-render and restore focus from a selector.
+- The visuals rail is a column: the type list (`.libitems`) scrolls on its own on wide screens so the Tips
+  list (`.gestures`) stays at the bottom; collapsed to icons or on narrow screens the tips are hidden.
 - The page tabs (`renderPages()`) and the arrange bar (`renderArrange()`) sit outside the scrolling stage,
   in `.mid`.
 - Screens wider than 900px: the side panel button (`#panelBtn`, `setPanelMin()`) hides the right panel by
@@ -250,10 +254,30 @@ undoes (two fingers) or redoes (three) in Sketch mode. `.stage` has `touch-actio
 `gesturestart` is cancelled, so pinching zooms the canvas, not the app; one finger on the grey stage no
 longer scrolls (two fingers pan).
 
+### Toolbar
+`renderSkTools()` draws one row: the current-tool button (`skexpand`), colours, the tool's sizes (fill shows a
+one-line hint instead), the Stability slider for drawing tools (0–90, step 5), undo, redo, Clear and Done.
+Expanded, a second row lists every tool and a pin (`skpin`, kept in `datasketch-skpin`). `setTool()` picks a
+tool, remembers the last non-eraser tool in `ui.sk.prev`, and collapses the row unless pinned.
+
+### Tool ring, double-tap and hover
+- **Ring:** a Pencil `pointerdown` that stays within 4px for 400 ms (`ringT` in `sketchDown()`) cancels the
+  stroke (restoring anything an eraser touched) and calls `openRing()` at the tip; a right-click on the page
+  in Sketch mode does the same (`contextmenu`). Six icon-only buttons sit on a 66px circle around a hub
+  showing the colour. While that Pencil is still down, `ringMove()` highlights the tool under it by angle and
+  `ringUp()` picks it on lift; lifting in the hub leaves the ring open for a tap. A tap outside, the hub or
+  Escape closes it. Holding after drawing is QuickShape, not the ring: the ring timer stops at the first
+  movement.
+- **Double-tap:** a still Pencil tap under 250 ms is remembered (`lastTap`, with the sketch before it); a
+  second within 400 ms and 24px restores that sketch (so neither tap leaves a dot, an erasure or a fill)
+  and swaps between the tool and the eraser.
+- **Hover:** a Pencil `pointermove` with no buttons over the page, while the Pencil would draw, positions
+  `#hoverc`: a circle the width of the tool's stroke at mid pressure (at least 6px on screen), in the colour;
+  dashed for the eraser, a filled dot for fill. It hides on contact, on finger or Pencil movement with a
+  button down, and 700 ms after the last hover event.
+
 ### Tools and strokes
-- Tools: pencil, pen, brush, highlighter, fill, eraser. Tapping a tool selects it and shows its sizes and,
-  for drawing tools, a Stability slider (0–90, step 5); fill shows how to use it. Tapping it again hides
-  them. Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
+- Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
   tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
 - Stability is an exponential moving average on the input points: each new point moves the stroke
   `1 - stability / 100` of the way towards the pointer. `stabOf(tool)` reads `ui.sk.stab[tool]`, falling back
@@ -341,7 +365,12 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
   and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a held rough
   box, circle and line snap, the same box without a hold and a held scribble do not; Make visual places a
   visual in the box; Fill fills a snapped box and a freehand loop, clears with the same colour, explains a
-  tap on an open line, and undoes. Stability:
+  tap on an open line, and undoes. Toolbar: collapsed by default, expands, a pick collapses it, the pin keeps
+  it open across a reload. Ring: a still 400 ms hold opens it with no dot, it is icons only, sliding
+  highlights and lifting picks, a hub lift keeps it for a tap, Escape and the hub close it, right-click opens
+  it, and draw-then-hold still snaps. Double-tap swaps to the eraser and back with no marks; a single tap
+  still draws a dot. Hover circle: shown, grows with size, hides on contact and when hover stops, absent with
+  Sketch off. Tips: nine rows, visible at the bottom of the rail. Stability:
   each tool shows its default, the eraser has none, the same zigzag at 90 is much shorter than at 0 and
   still ends at the lift point, and the value survives a reload.
 - Light and dark logo; CSV export downloads.
@@ -375,8 +404,9 @@ scrolling, Add to Home Screen and offline launch.
 
 ## 15. Limits
 
-- Web apps get Apple Pencil pressure, tilt and hover, but not double-tap, squeeze, barrel roll (WebKit's
-  `twist` reads 0) or haptics. Hover is not used. Drawing latency is close to, but not, native: Safari 18.2+
+- Web apps get Apple Pencil pressure, tilt and hover, but not the Pencil's own double-tap or squeeze, barrel
+  roll (WebKit's `twist` reads 0) or haptics. The tool ring opens on a held tip because squeeze never reaches
+  Safari; a native shell (`UIPencilInteraction`) would be needed to open it on squeeze. Drawing latency is close to, but not, native: Safari 18.2+
   offers `getPredictedEvents()`, which the app does not use yet.
 - A Pencil resting palm is only guarded against once the Pencil touches: a palm that lands first can start a
   finger drag, which the Pencil's touch then cancels.

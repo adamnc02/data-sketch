@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.1.0.**
+made to be added to an iPad Home Screen. **Status: 1.2.0.**
 
 ## Stack
 
@@ -46,10 +46,16 @@ offline once loaded.
   mode" lets a finger draw instead. Pencil, pen, brush, highlighter, fill and eraser; pressure-sensitive,
   and the pencil and brush broaden when the Pencil is tilted past writing angle. Each drawing tool has its
   own sizes and a Stability slider (smoothing, 0–90), kept per device.
+- **Sketch toolbar:** colours, size, stability, undo, redo, Clear and Done. The current-tool button expands the
+  brushes; picking one collapses them again unless the pin is on.
+- **Tool ring:** hold the Pencil tip still (or right-click with a mouse) and a ring of tool icons opens
+  around it; slide onto one and lift, or tap one. Double-tap the tip to swap between the tool and the
+  eraser. A hovering Pencil shows a circle of the tool's size and colour.
 - **QuickShape:** draw and hold still at the end; a line, rectangle or ellipse snaps clean. A snapped
   rectangle offers **Make visual**, which places any visual type in exactly that box.
 - **Fill:** tap inside a closed drawing (a snapped rectangle or ellipse, or any outline whose ends meet) to
   fill it with the chosen colour; the same colour again clears it.
+- **Tips:** the gestures and editing shortcuts are listed at the bottom of the visuals rail.
 - **Gestures (any mode):** pinch to zoom, drag with two fingers to pan. In Sketch mode, a two-finger tap
   undoes and a three-finger tap redoes.
 - **Theme JSON:** a Power BI theme file from the current styling, to copy or download.

@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -24,6 +24,7 @@ const I = {
   'al-m': ic('<path d="M3 12h18"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="8" width="4" height="8" rx="1"/>'), 'al-b': ic('<path d="M3 20h18"/><rect x="6" y="5" width="4" height="12" rx="1"/><rect x="14" y="10" width="4" height="7" rx="1"/>'),
   'ds-h': ic('<path d="M4 3v18M20 3v18"/><rect x="9" y="7" width="6" height="10" rx="1"/>'), 'ds-v': ic('<path d="M3 4h18M3 20h18"/><rect x="7" y="9" width="10" height="6" rx="1"/>'),
   sidepanel: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>'),
+  pin: ic('<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>'),
   x: ic(P.close), back: ic('<path d="M15 5l-7 7 7 7"/>'), fwd: ic('<path d="M9 5l7 7-7 7"/>'),
   more: ic('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'), plus: ic('<path d="M12 5v14M5 12h14"/>'),
   up: ic('<path d="M6 15l6-6 6 6"/>'), down: ic('<path d="M6 9l6 6 6-6"/>'),
@@ -63,7 +64,7 @@ const BASE = { title: 'Sales overview', headerBg: '#1F3A5F', headerFg: '#FFFFFF'
 const PAGE_SIZES = [[1280, 720, '16:9'], [1600, 900, '16:9 large'], [1600, 800, '2:1'], [960, 720, '4:3'], [816, 1056, 'Letter'], [320, 240, 'Tooltip']];
 const TOOLS = {
   pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .9, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
-  pen: { label: 'Pen', sizes: [1.5, 2.5, 4, 7], press: null, smooth: .6, op: 1, icon: '<path d="M12 19l7-7-4-4-7 7-1 5z"/><path d="M15 8l2-5 4 4-5 2"/>' },
+  pen: { label: 'Pen', sizes: [1.5, 2.5, 4, 7], press: null, smooth: .6, op: 1, icon: '<g transform="rotate(45 12 12)"><path d="M12 22l-5-8.5c0-3 1-5 2-5.5h6c1 .5 2 2.5 2 5.5z"/><path d="M12 22v-7"/><circle cx="12" cy="13.5" r="1.4"/><path d="M9 8V3h6v5"/></g>' },
   brush: { label: 'Brush', sizes: [4, 8, 14, 24], press: [.12, 1.7], taper: true, tilt: 1.2, smooth: .5, op: 1, icon: '<path d="M10 14l8-10a2 2 0 013 2.5L13 16"/><path d="M9 14c-3 0-4 2-4 4 0 1-1 2-2 2 4 1 9 0 9-4z"/>' },
   marker: { label: 'Highlighter', sizes: [10, 16, 24, 34], press: null, smooth: .6, op: .35, cap: 'butt', icon: '<path d="M9 12l-5 5v3h3l5-5"/><path d="M8 11l7-7 5 5-7 7z"/>' },
   fill: { label: 'Fill', icon: '<path d="M5 11l6-6 8 8-6 6a2 2 0 01-2.8 0L5 13.8a2 2 0 010-2.8z"/><path d="M5 12h13"/><path d="M20 15s1.5 2 1.5 3a1.5 1.5 0 01-3 0c0-1 1.5-3 1.5-3z"/>' },
@@ -104,7 +105,7 @@ function setSaved(t) { const el = $('#saved'); if (el) el.textContent = t; }
 /* ---------- model helpers ---------- */
 const ui = {
   mode: 'wf', view: 'home', wfId: null, sel: null, panel: 'tab', tab: 'settings', panelOpen: false, flipped: new Set(), hl: null, hlBefore: null, last: null,
-  zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, stab: {}, pop: false },
+  zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, stab: {}, open: false, pinned: false, prev: 'pencil' },
   skUndo: [], skRedo: [], drawing: false, ghost: false, paramSel: {}, slicerSel: {}, dropOpen: null, bmOpen: null, mOpen: null, vdata: new Map(), exportCache: null
 };
 const cur = () => ui.mode === 'tpl' ? store.templates.find(t => t.id === ui.wfId) : store.wireframes.find(w => w.id === ui.wfId);
@@ -463,7 +464,7 @@ function thumbRects(list, S) {
 }
 function thumb(o) { const s = o.settings, tpl = tplOf(o), p = o.pages ? o.pages[0] : o; return `<svg viewBox="0 0 ${s.pageW} ${s.pageH}" aria-hidden="true"><rect width="${s.pageW}" height="${s.pageH}" fill="${s.pageBg}"/>${s.showHeader !== false ? `<rect width="${s.pageW}" height="${s.headerH}" fill="${s.headerBg}"/>` : ''}${tpl && !o.hideLayout ? thumbRects(tpl.visuals, tpl.settings) : ''}${thumbRects(p.visuals, s)}${o.showSketch === false ? '' : (p.sketch || []).map(strokeSVG).join('')}</svg>`; }
 function renderHome() {
-  clearQS();
+  clearQS(); closeRing(); hideHover();
   ui.view = 'home'; ui.wfId = null; ui.hl = null; $('#tip').hidden = true;
   const wfs = store.wireframes.slice().sort((a, b) => b.updated - a.updated), tn = id => store.templates.find(t => t.id === id)?.client || 'No template';
   const when = t => new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -478,9 +479,10 @@ function renderHome() {
 /* ---------- editor ---------- */
 function openWf(id, mode = 'wf') {
   Object.assign(ui, { mode, view: 'editor', wfId: id, sel: null, multi: new Set(), multiMode: false, panel: 'tab', tab: 'settings', hl: null, skUndo: [], skRedo: [], paramSel: {}, slicerSel: {}, dropOpen: null, ghost: false });
-  ui.sk.on = false; ui.sk.pop = false; ui.vdata.clear();
+  ui.sk.on = false; ui.sk.open = false; closeRing(); ui.vdata.clear();
   const o = cur(), T_ = mode === 'tpl';
   ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
+  try { ui.sk.pinned = localStorage.getItem('datasketch-skpin') === '1'; } catch (e) {}
   try { ui.sk.stab = JSON.parse(localStorage.getItem('datasketch-stability') || '{}') || {}; } catch (e) { ui.sk.stab = {}; }
   try { ui.libMin = localStorage.getItem('datasketch-libmin') === '1'; ui.panelMin = localStorage.getItem('datasketch-panelmin') === '1'; } catch (e) {}
   const tn = T_ ? 'Client template' : tplOf(o)?.client;
@@ -504,8 +506,17 @@ function setPanelMin(on) {
 function libHTML() {
   const T_ = ui.mode === 'tpl', min = !!ui.libMin;
   return `<aside class="lib ${min ? 'min' : ''}" aria-label="Visuals"><div class="libhead"><h2>${T_ ? 'Layout elements' : 'Visuals'}</h2><button class="icon libtog" data-act="libmin" aria-expanded="${!min}" aria-label="${min ? 'Show labels' : 'Collapse to icons'}">${min ? I.fwd : I.back}</button></div>
- ${Object.entries(TYPES).filter(([k]) => !T_ || LAYOUT_TYPES.includes(k)).map(([k, t]) => `<button class="libitem" data-type="${k}" data-act="add" title="${t.name}" aria-label="${t.name}">${I[k]}<span class="lbl">${t.name}</span></button>`).join('')}
- <p class="hint">${T_ ? 'Build the client’s page header, nav rail and logo here. Every wireframe using this template shows this layout, locked, behind its visuals.' : 'Drag onto the page or click to add. With a visual selected, click a type to change it. Double-click a visual to write notes. Click bars, rows or slicer items to filter and highlight. Turn on Sketch to draw with Apple Pencil.'}</p></aside>`;
+ <div class="libitems">${Object.entries(TYPES).filter(([k]) => !T_ || LAYOUT_TYPES.includes(k)).map(([k, t]) => `<button class="libitem" data-type="${k}" data-act="add" title="${t.name}" aria-label="${t.name}">${I[k]}<span class="lbl">${t.name}</span></button>`).join('')}</div>
+ ${T_ ? '<p class="hint">Build the client’s page header, nav rail and logo here. Every wireframe using this template shows this layout, locked, behind its visuals.</p>' : `<div class="gestures" aria-label="Tips"><h3>Tips</h3><dl>
+  <dt>Tap a type</dt><dd>Add / change</dd>
+  <dt>Double-click</dt><dd>Notes</dd>
+  <dt>Hold Pencil tip</dt><dd>Tool ring</dd>
+  <dt>Double-tap tip</dt><dd>Eraser</dd>
+  <dt>Draw + hold</dt><dd>Snap shape</dd>
+  <dt>Pinch</dt><dd>Zoom</dd>
+  <dt>2-finger drag</dt><dd>Pan</dd>
+  <dt>2 / 3-finger tap</dt><dd>Undo / redo</dd>
+  <dt>Finger in Sketch</dt><dd>Edit</dd></dl></div>`}</aside>`;
 }
 function renderPages() {
   const el = $('#pagetabs'); if (!el) return;
@@ -592,7 +603,7 @@ function settingsBody() {
  <section><h3>All visuals</h3>${visualFields(s)}</section>
  <section><h3>Theme colours</h3>${F.pal('data-pal', s.palette)}</section>
  <section><h3>Grid</h3><label class="field"><span>Grid size (px)</span><input type="number" min="5" max="60" data-g="size" value="${g.size}" style="width:80px"></label>${F.sw('g', 'snap', 'Snap to grid', g.snap)}${F.sw('g', 'show', 'Show grid', g.show)}</section>
- ${T_ ? '' : `<section><h3>Sketch</h3>${F.sw('k', 'pencilDraws', 'Apple Pencil draws outside Sketch mode', o.pencilDraws === true)}${F.sw('k', 'fingerDraws', 'Finger draws in Sketch mode', o.fingerDraws === true)}${F.sw('k', 'showSketch', 'Show sketches', o.showSketch !== false)}<p class="hint">Turn on Sketch in the top bar to draw with Apple Pencil; your finger keeps selecting, moving and resizing visuals. With Sketch off, the Pencil works like a finger. Draw and hold to snap a line, rectangle or ellipse. Pinch to zoom and drag with two fingers to pan; in Sketch mode, tap with two fingers to undo and three to redo.</p></section>
+ ${T_ ? '' : `<section><h3>Sketch</h3>${F.sw('k', 'pencilDraws', 'Apple Pencil draws outside Sketch mode', o.pencilDraws === true)}${F.sw('k', 'fingerDraws', 'Finger draws in Sketch mode', o.fingerDraws === true)}${F.sw('k', 'showSketch', 'Show sketches', o.showSketch !== false)}<p class="hint">Turn on Sketch in the top bar to draw with Apple Pencil; your finger keeps selecting, moving and resizing visuals. With Sketch off, the Pencil works like a finger. Hold the Pencil tip for the tool ring (right-click on desktop); double-tap it to swap with the eraser. Draw and hold to snap a line, rectangle or ellipse. Pinch to zoom and drag with two fingers to pan; in Sketch mode, tap with two fingers to undo and three to redo.</p></section>
  <section><h3>Notes</h3>${segH('notesmode', o.notesMode, [['hidden', 'On flip'], ['flip', 'Reveal all'], ['side', 'Alongside']], 'Notes display')}<p class="hint">Double-click any visual to flip it and type notes.</p></section>`}`;
 }
 function layersBody() {
@@ -726,7 +737,7 @@ function addVisual(type, x, y) {
   pg().visuals.push(v); renderPage(); openSheet(v.id); save();
 }
 function goPage(id) {
-  const o = cur(); o.pageId = id; clearQS();
+  const o = cur(); o.pageId = id; clearQS(); closeRing();
   Object.assign(ui, { sel: null, multi: new Set(), hl: null, skUndo: [], skRedo: [], paramSel: {}, slicerSel: {}, dropOpen: null });
   ui.vdata.clear(); ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
   if (ui.panel === 'visual') ui.panel = 'tab';
@@ -810,6 +821,8 @@ document.addEventListener('pointerdown', e => {
   if (ui.view !== 'editor') return;
   const lib = e.target.closest('.libitem'); if (lib) return libDown(e, lib);
   if (qs && !e.target.closest('.qschip')) clearQS();
+  if (ring && ring.pointerId == null && !e.target.closest('.skring')) closeRing();
+  if (e.pointerType === 'pen') hideHover();
   if (e.pointerType === 'touch' && e.target.closest('#stage') && !e.target.closest('#sktools')) {
     if (ui.drawing === 'pen') { e.preventDefault(); return; }   // palm resting while the Pencil draws
     touches.set(e.pointerId, { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY });
@@ -866,6 +879,7 @@ document.addEventListener('pointerdown', e => {
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 });
 document.addEventListener('pointermove', e => {
+  if (e.pointerType === 'pen' && !e.buttons && ui.view === 'editor') hoverAt(e); else if (e.pointerType !== 'mouse') hideHover();
   if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
     const t = touches.get(e.pointerId); t.x = e.clientX; t.y = e.clientY;
     if (gesture) { if (Math.hypot(t.x - t.x0, t.y - t.y0) > 12) gesture.moved = true; if (gesture.moved && gesture.max === 2 && touches.size === 2) pinch(); }
@@ -888,6 +902,7 @@ const touchEnd = e => {
 };
 // iPad Safari can still pan the stage under touch-action:none, which cancels the drag. Block the native pan on visuals and while drawing.
 document.addEventListener('touchmove', e => { if (ui.view === 'editor' && (ui.drawing || (e.touches && e.touches.length > 1 && e.target.closest && e.target.closest('#stage')) || (e.target.closest && e.target.closest('#page .vis[data-id]') && !e.target.closest('textarea')))) e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', e => { if (ui.view === 'editor' && ui.sk.on && ui.mode === 'wf' && e.target.closest('#page')) { e.preventDefault(); openRing(e.clientX, e.clientY, null); } });
 // Safari's own pinch would zoom the whole app instead of the canvas
 document.addEventListener('gesturestart', e => { if (ui.view === 'editor') e.preventDefault(); });
 document.addEventListener('pointerup', touchEnd); document.addEventListener('pointercancel', touchEnd);
@@ -965,7 +980,7 @@ function tiltOf(ev) {
   return clamp((TILT_FROM - a) / TILT_FROM, 0, 1);
 }
 /* ---------- QuickShape ---------- */
-let qs = null;
+let qs = null, lastTap = null;
 function densify(list, step = 6) {
   const out = [list[0]];
   for (let i = 1; i < list.length; i++) { const [ax, ay] = list[i - 1], [bx, by] = list[i], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step)); for (let k = 1; k <= n; k++) out.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]); }
@@ -1030,11 +1045,19 @@ function sketchDown(e, page) {
   const tool = (ui.sk.on || e.pointerType !== 'pen') ? ui.sk.tool : (ui.sk.tool), T = TOOLS[tool], rect = page.getBoundingClientRect();
   const rawPt = ev => [(ev.clientX - rect.left) / ui.scale, (ev.clientY - rect.top) / ui.scale, ev.pointerType === 'pen' ? (ev.pressure || .5) : .5, tiltOf(ev)];
   clearQS();
-  if (tool === 'fill') { const [x, y] = rawPt(e); fillAt(x, y); return; }
+  if (tool === 'fill' && e.pointerType !== 'pen') { const [x, y] = rawPt(e); fillAt(x, y); return; }
   pushUndo(); ui.drawing = e.pointerType; page.setPointerCapture(e.pointerId);
-  let mv, s = null, path = null, changed = false, last = null, cancelled = false, hold = null, snapped = false, lastRaw = null;
+  let up0 = null, mv, s = null, path = null, changed = false, last = null, cancelled = false, hold = null, snapped = false, lastRaw = null;
+  // Pencil only: holding still for 400 ms before moving opens the tool ring instead of drawing
+  const t0 = Date.now(), sx0 = e.clientX, sy0 = e.clientY, pen = e.pointerType === 'pen', before = clone(ui.skUndo[ui.skUndo.length - 1] || []), undoLen = ui.skUndo.length - 1; let still = true;
+  const ringT = pen ? setTimeout(() => { if (still && strokeCancel) { strokeCancel(); openRing(sx0, sy0, e.pointerId); } }, 400) : null;
+  const moveCheck = ev => { if (still && Math.hypot(ev.clientX - sx0, ev.clientY - sy0) > 4) { still = false; clearTimeout(ringT); } };
+  page.addEventListener('pointermove', moveCheck);
   const size = ui.sk.size[tool];
-  if (tool === 'eraser') {
+  if (tool === 'fill') {
+    mv = () => {};
+    up0 = () => { ui.skUndo.pop(); if (still) { const [x, y] = rawPt(e); fillAt(x, y); } };
+  } else if (tool === 'eraser') {
     mv = ev => { const [x, y] = rawPt(ev), n = pg().sketch.length, r = size / 2 + 4; pg().sketch = pg().sketch.filter(st => !st.pts.some(p => Math.hypot(p[0] - x, p[1] - y) < r + (st.w || 2) / 2)); if (pg().sketch.length !== n) { changed = true; redrawSketch(); } };
     mv(e);
   } else {
@@ -1051,11 +1074,18 @@ function sketchDown(e, page) {
     };
     draw();
   }
-  strokeCancel = () => { cancelled = true; if (path) path.remove(); finish(); ui.skUndo.pop(); };
-  const finish = () => { clearTimeout(hold); page.removeEventListener('pointermove', mv); page.removeEventListener('pointerup', up); page.removeEventListener('pointercancel', up); ui.drawing = false; strokeCancel = null; };
+  strokeCancel = () => { cancelled = true; if (path) path.remove(); finish(); ui.skUndo.pop(); if (changed) { pg().sketch = before; redrawSketch(); renderSkTools(); } };
+  const finish = () => { clearTimeout(hold); clearTimeout(ringT); page.removeEventListener('pointermove', moveCheck); page.removeEventListener('pointermove', mv); page.removeEventListener('pointerup', up); page.removeEventListener('pointercancel', up); ui.drawing = false; strokeCancel = null; };
   const up = ev => {
     finish();
     if (cancelled) return;
+    // Pencil double-tap: two quick, still taps close together swap the tool and the eraser, leaving no marks
+    if (pen && still && Date.now() - t0 < 250) {
+      const tp = lastTap; lastTap = null;
+      if (tp && Date.now() - tp.t < 400 && Math.hypot(sx0 - tp.x, sy0 - tp.y) < 24) { pg().sketch = tp.before; ui.skUndo.length = tp.undoLen; ui.skRedo = []; redrawSketch(); setTool(ui.sk.tool === 'eraser' ? (ui.sk.prev || 'pencil') : 'eraser'); save(); return; }
+      lastTap = { t: Date.now(), x: sx0, y: sy0, before, undoLen };
+    } else lastTap = null;
+    if (up0) { up0(); renderSkTools(); return; }
     if (s) {
       const raw = rawPt(ev), lp = s.pts[s.pts.length - 1];
       if (!snapped && s.pts.length > 1 && Math.hypot(raw[0] - lp[0], raw[1] - lp[1]) > .8) s.pts.push([raw[0], raw[1], lp[2], lp[3]]);
@@ -1072,16 +1102,55 @@ function renderSkTools() {
   const el = $('#sktools'); if (!el) return;
   const b = $('#skBtn'); if (b) b.setAttribute('aria-pressed', ui.sk.on);
   if (!ui.sk.on) { el.innerHTML = ''; return; }
-  const t = ui.sk.tool, T = TOOLS[t];
-  el.innerHTML = `<div class="sktools" role="toolbar" aria-label="Sketch tools"><div class="skrow">
-  ${Object.entries(TOOLS).map(([k, x]) => `<button class="tool" data-act="sktool" data-val="${k}" aria-pressed="${t === k}" aria-expanded="${t === k && ui.sk.pop}">${ic(x.icon)}<span>${x.label}</span></button>`).join('')}
+  const t = ui.sk.tool, T = TOOLS[t], open = ui.sk.open || ui.sk.pinned;
+  const dot = sz => Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz));
+  el.innerHTML = `<div class="sktools ${open ? 'open' : ''}" role="toolbar" aria-label="Sketch tools"><div class="skrow">
+  <button class="curtool" data-act="skexpand" aria-expanded="${open}" aria-label="${T.label}: ${open ? 'hide' : 'show'} tools" title="${T.label}">${ic(T.icon)}${open ? I.up : I.down}</button>
   <span class="sep"></span>${SK_COLOURS.map(([c, l]) => `<button data-act="skcolor" data-val="${c}" aria-pressed="${ui.sk.color === c}" aria-label="${l}"><span class="dot" style="background:${c}"></span></button>`).join('')}
+  ${T.sizes ? `<span class="sep"></span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${dot(sz)}px;height:${dot(sz)}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}` : `<span class="sep"></span><span class="lab">Tap inside a closed shape to fill it</span>`}
+  ${T.smooth != null ? `<span class="sep"></span><label class="stab"><span class="lab">Stability</span><input type="range" min="0" max="90" step="5" data-skstab value="${stabOf(t)}" aria-label="${T.label} stability"><output>${stabOf(t)}</output></label>` : ''}
   <span class="sep"></span><button data-act="skundo" aria-label="Undo" ${ui.skUndo.length ? '' : 'disabled'}>${I.undo}</button><button data-act="skredo" aria-label="Redo" ${ui.skRedo.length ? '' : 'disabled'}>${I.redo}</button><button data-act="skclear" ${(pg().sketch || []).length ? '' : 'disabled'}>Clear</button>
-  <span class="sep"></span><button class="primary" data-act="sketch">Done</button></div>
-  ${ui.sk.pop && t === 'fill' ? '<div class="weights"><span class="lab">Tap inside a closed shape to fill it with the chosen colour. Tap it again with the same colour to clear the fill.</span></div>' : ''}
-  ${ui.sk.pop && t !== 'fill' ? `<div class="weights"><span class="lab">${T.label} size</span>${T.sizes.map(sz => `<button data-act="skw" data-val="${sz}" aria-pressed="${ui.sk.size[t] === sz}" aria-label="Size ${sz}"><span class="wdot" style="width:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;height:${Math.min(28, Math.max(3, t === 'eraser' ? sz / 2 : sz))}px;${t === 'eraser' ? 'background:transparent;border:2px solid currentColor' : ''}"></span></button>`).join('')}
-  ${t === 'eraser' ? '' : `<span class="sep"></span><label class="stab"><span class="lab">Stability</span><input type="range" min="0" max="90" step="5" data-skstab value="${stabOf(t)}" aria-label="${T.label} stability"><output>${stabOf(t)}</output></label>`}</div>` : ''}</div>`;
+  <button class="primary" data-act="sketch">Done</button></div>
+  ${open ? `<div class="skrow skbrushes">${Object.entries(TOOLS).map(([k, x]) => `<button class="tool" data-act="sktool" data-val="${k}" aria-pressed="${t === k}">${ic(x.icon)}<span>${x.label}</span></button>`).join('')}<span class="spacer"></span><button class="icon" data-act="skpin" aria-pressed="${ui.sk.pinned}" aria-label="${ui.sk.pinned ? 'Unpin tools' : 'Keep tools open'}" title="${ui.sk.pinned ? 'Unpin tools' : 'Keep tools open'}">${I.pin}</button></div>` : ''}</div>`;
 }
+function setTool(t) { if (t !== 'eraser' && ui.sk.tool !== 'eraser') ui.sk.prev = t; else if (t === 'eraser' && ui.sk.tool !== 'eraser') ui.sk.prev = ui.sk.tool; ui.sk.tool = t; if (!ui.sk.pinned) ui.sk.open = false; renderSkTools(); updateHover(); }
+/* ---------- tool ring: hold the Pencil tip still, or right-click, to open it around the pointer ---------- */
+let ring = null;
+const RING_R = 66;
+function openRing(x, y, pointerId) {
+  closeRing();
+  const keys = Object.keys(TOOLS), cx = clamp(x, RING_R + 30, innerWidth - RING_R - 30), cy = clamp(y, RING_R + 30, innerHeight - RING_R - 30);
+  const el = document.createElement('div'); el.className = 'skring'; el.style.left = cx + 'px'; el.style.top = cy + 'px';
+  el.setAttribute('role', 'menu'); el.setAttribute('aria-label', 'Sketch tools');
+  el.innerHTML = keys.map((k, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / keys.length; return `<button role="menuitem" data-act="ringtool" data-val="${k}" aria-label="${TOOLS[k].label}" aria-pressed="${ui.sk.tool === k}" style="left:${Math.cos(a) * RING_R}px;top:${Math.sin(a) * RING_R}px">${ic(TOOLS[k].icon)}</button>`; }).join('')
+    + `<button class="hub" data-act="ringclose" aria-label="Close"><span class="dot" style="background:${ui.sk.color}"></span></button>`;
+  document.body.appendChild(el);
+  ring = { el, cx, cy, keys, pointerId, hot: null };
+  if (pointerId != null) { document.addEventListener('pointermove', ringMove); document.addEventListener('pointerup', ringUp); document.addEventListener('pointercancel', ringUp); }
+}
+// While the Pencil that opened the ring is still down, sliding onto a tool highlights it and lifting picks it.
+function ringHit(x, y) { const dx = x - ring.cx, dy = y - ring.cy; if (Math.hypot(dx, dy) < 32) return null; const n = ring.keys.length, i = Math.round(((Math.atan2(dy, dx) + Math.PI / 2) / (2 * Math.PI) * n + n) % n) % n; return ring.keys[i]; }
+function ringMove(e) { if (!ring || e.pointerId !== ring.pointerId) return; ring.hot = ringHit(e.clientX, e.clientY); ring.el.querySelectorAll('[data-act=ringtool]').forEach(b => b.classList.toggle('hot', b.dataset.val === ring.hot)); }
+function ringUp(e) {
+  if (!ring || e.pointerId !== ring.pointerId) return;
+  document.removeEventListener('pointermove', ringMove); document.removeEventListener('pointerup', ringUp); document.removeEventListener('pointercancel', ringUp);
+  const hot = ringHit(e.clientX, e.clientY); ring.pointerId = null;
+  if (hot) { closeRing(); setTool(hot); }
+}
+function closeRing() { if (!ring) return; document.removeEventListener('pointermove', ringMove); document.removeEventListener('pointerup', ringUp); document.removeEventListener('pointercancel', ringUp); ring.el.remove(); ring = null; }
+/* ---------- hover circle: the tool's size and colour under a hovering Pencil ---------- */
+let hoverT = null, lastHover = null;
+const drawsPen = () => ui.mode === 'wf' && (ui.sk.on || cur()?.pencilDraws === true);
+function hoverAt(e) {
+  lastHover = e; const c = $('#hoverc'), page = e.target.closest && e.target.closest('#page');
+  if (!c || !page || !drawsPen() || ring) { hideHover(); return; }
+  const t = ui.sk.tool, T = TOOLS[t], w = ui.sk.size[t] || 0, d = t === 'fill' ? 18 : t === 'eraser' ? w + 8 : T.press ? w * (T.press[0] + T.press[1]) / 2 : w, px = Math.max(6, d * ui.scale);
+  c.className = 'hoverc ' + t; c.style.width = c.style.height = px + 'px'; c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+  c.style.setProperty('--hc', ui.sk.color); c.hidden = false;
+  clearTimeout(hoverT); hoverT = setTimeout(hideHover, 700);
+}
+function hideHover() { const c = $('#hoverc'); if (c) c.hidden = true; clearTimeout(hoverT); }
+function updateHover() { const c = $('#hoverc'); if (c && !c.hidden && lastHover) hoverAt(lastHover); }
 
 /* ---------- clicks ---------- */
 function arm(btn, label, fn) { if (btn.dataset.armed) { fn(); return; } btn.dataset.armed = '1'; const old = btn.innerHTML; btn.textContent = label; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.innerHTML = old; } }, 3000); }
@@ -1251,10 +1320,14 @@ document.addEventListener('click', e => {
     case 'qsmake': qsMenu(); break;
     case 'qstype': qsMake(b.dataset.type); break;
     case 'qsclose': clearQS(); break;
-    case 'sketch': clearQS(); ui.sk.on = !ui.sk.on; ui.sk.pop = false; ui.multi.clear(); setSel(null); if (ui.panel === 'visual') { ui.panel = 'tab'; renderPanel(); } renderSkTools(); renderPage(); break;
-    case 'sktool': { const t = b.dataset.val; if (ui.sk.tool === t) ui.sk.pop = !ui.sk.pop; else { ui.sk.tool = t; ui.sk.pop = true; } renderSkTools(); break; }
-    case 'skcolor': ui.sk.color = b.dataset.val; if (ui.sk.tool === 'eraser') ui.sk.tool = 'pencil'; renderSkTools(); break;
-    case 'skw': ui.sk.size[ui.sk.tool] = +b.dataset.val; ui.sk.pop = false; renderSkTools(); break;
+    case 'sketch': clearQS(); closeRing(); hideHover(); ui.sk.on = !ui.sk.on; ui.sk.open = false; ui.multi.clear(); setSel(null); if (ui.panel === 'visual') { ui.panel = 'tab'; renderPanel(); } renderSkTools(); renderPage(); break;
+    case 'sktool': setTool(b.dataset.val); break;
+    case 'skexpand': ui.sk.open = !(ui.sk.open || ui.sk.pinned); if (!ui.sk.open && ui.sk.pinned) { ui.sk.pinned = false; try { localStorage.setItem('datasketch-skpin', '0'); } catch (e) {} } renderSkTools(); break;
+    case 'skpin': ui.sk.pinned = !ui.sk.pinned; ui.sk.open = true; try { localStorage.setItem('datasketch-skpin', ui.sk.pinned ? '1' : '0'); } catch (e) {} renderSkTools(); break;
+    case 'ringtool': closeRing(); setTool(b.dataset.val); break;
+    case 'ringclose': closeRing(); break;
+    case 'skcolor': ui.sk.color = b.dataset.val; if (ui.sk.tool === 'eraser') ui.sk.tool = ui.sk.prev || 'pencil'; renderSkTools(); break;
+    case 'skw': ui.sk.size[ui.sk.tool] = +b.dataset.val; renderSkTools(); updateHover(); break;
     case 'skundo': skUndo(); break;
     case 'skredo': skRedo(); break;
     case 'skclear': arm(b, 'Clear all?', () => { pushUndo(); pg().sketch = []; redrawSketch(); renderSkTools(); save(); }); break;
@@ -1353,6 +1426,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('keydown', e => {
   const el = e.target;
+  if (e.key === 'Escape' && ring) { closeRing(); return; }
   if (e.key === 'Escape' && ui.view === 'editor' && (ui.sel || ui.multi.size) && !$('#dlg').open && !el.closest?.('input,textarea,select')) { clearSel(); return; }
   if (!el.classList || !el.classList.contains('vis') || el.classList.contains('locked')) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(el.dataset.id, true); }
