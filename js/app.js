@@ -968,22 +968,23 @@ function strokeSVG(s) {
   return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${T.op}"/>`;
 }
 // Pencil grain: graphite only marks the raised tooth of the paper. A seeded noise tile (fine grain over a
-// coarser tooth) is a luminance mask in page units, so the grain stays put under the page rather than
-// moving with each stroke, and overlapping strokes darken the same grains. One mask serves every SVG in
-// the document (canvas and thumbnails), so it is added once at start-up.
+// weaker, coarser tooth), each grain S page units across so it still reads at Fit zoom, is a luminance mask
+// in page units, so the grain stays put under the page rather than moving with each stroke, and overlapping
+// strokes darken the same grains. One mask serves every SVG in the document (canvas and thumbnails), so it
+// is added once at start-up.
 function grainDefs() {
-  const N = 128, G = 16, c = document.createElement('canvas'); c.width = c.height = N;
+  const N = 128, G = 16, S = 3, c = document.createElement('canvas'); c.width = c.height = N;
   const cx = c.getContext('2d'); if (!cx) return; const img = cx.createImageData(N, N);
   let seed = 20261102; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
   const g = Array.from({ length: G * G }, rnd), at = (i, j) => g[(j % G) * G + i % G];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const u = i * G / N, v = j * G / N, i0 = Math.floor(u), j0 = Math.floor(v), fu = u - i0, fv = v - j0;
     const tooth = at(i0, j0) * (1 - fu) * (1 - fv) + at(i0 + 1, j0) * fu * (1 - fv) + at(i0, j0 + 1) * (1 - fu) * fv + at(i0 + 1, j0 + 1) * fu * fv;
-    const k = clamp((.35 * tooth + .65 * rnd() - .05) * 1.7, 0, 1) * 255, o = (j * N + i) * 4;
+    const k = clamp((.2 * tooth + .8 * rnd() - .18) * 2.2, 0, 1) * 255, o = (j * N + i) * 4;
     img.data[o] = img.data[o + 1] = img.data[o + 2] = k; img.data[o + 3] = 255;
   }
   cx.putImageData(img, 0, 0);
-  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs><pattern id="skgrainp" patternUnits="userSpaceOnUse" width="${N}" height="${N}"><image href="${c.toDataURL()}" width="${N}" height="${N}"/></pattern><mask id="skgrain"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#skgrainp)"/></mask></defs></svg>`);
+  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs><pattern id="skgrainp" patternUnits="userSpaceOnUse" width="${N * S}" height="${N * S}"><image href="${c.toDataURL()}" width="${N * S}" height="${N * S}"/></pattern><mask id="skgrain"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#skgrainp)"/></mask></defs></svg>`);
 }
 // A pencil pressed lightly leaves less graphite: the stroke's darkness follows its average pressure.
 function grainOp(pts) { const n = pts.length; return Math.min(1, .6 + .45 * pts.reduce((t, p) => t + (p[2] ?? .5), 0) / n).toFixed(2); }

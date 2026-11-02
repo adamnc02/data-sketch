@@ -280,7 +280,8 @@ tool, remembers the last non-eraser tool in `ui.sk.prev`, and collapses the row 
 - Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
   tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
 - Pencil grain (`grain: true` in `TOOLS`): `grainDefs()` runs once at start-up, draws a seeded 128 × 128
-  noise tile (fine per-pixel noise over a coarser 16 × 16 "tooth") on a canvas, and adds a hidden
+  noise tile (fine per-pixel noise over a weaker 16 × 16 "tooth") on a canvas, drawn 3 page units per
+  pixel (a 384-unit tile) so the grain is still visible at Fit zoom on the iPad, and adds a hidden
   `svg.skdefs` holding pattern `#skgrainp` and luminance mask `#skgrain`. `strokeSVG()` gives every pencil
   stroke `mask="url(#skgrain)"` and an opacity from its average pressure (`grainOp()`, 0.6 + 0.45 × mean,
   at most 1). The pattern is in page units, so the grain is fixed to the page: strokes crossing the same
