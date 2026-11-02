@@ -427,8 +427,11 @@ scrolling, Add to Home Screen and offline launch.
 ## 15. Limits
 
 - Web apps get Apple Pencil pressure, tilt and hover, but not the Pencil's own double-tap or squeeze, barrel
-  roll (WebKit's `twist` reads 0) or haptics. The tool ring opens on a held tip because squeeze never reaches
-  Safari; a native shell (`UIPencilInteraction`) would be needed to open it on squeeze. Drawing latency is close to, but not, native: Safari 18.2+
+  roll (WebKit's `twist` reads 0) or haptics. Safari handles squeeze itself (in Safari 26 it shows its own
+  back/forward palette), and the page receives no event of any kind for it: no pointer, key, focus,
+  visibility or history event, checked with an event log on an iPad Pro and Apple Pencil Pro in Safari 26.3.
+  The tool ring therefore opens on a held tip; a native shell (`UIPencilInteraction`) would be needed to
+  open it on squeeze. Drawing latency is close to, but not, native: Safari 18.2+
   offers `getPredictedEvents()`, which the app does not use yet.
 - A Pencil resting palm is only guarded against once the Pencil touches: a palm that lands first can start a
   finger drag, which the Pencil's touch then cancels.
