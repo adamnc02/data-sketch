@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -964,19 +964,20 @@ function strokeSVG(s) {
   if (s.fill) return `<g><path d="${pathD(s.pts)}Z" fill="${s.fill}"/>${strokeSVG({ ...s, fill: null })}</g>`;
   const T = TOOLS[s.tool] || TOOLS.pen;
   if (!T.press) return `<path d="${pathD(s.pts)}" stroke="${s.c}" stroke-width="${s.w}" fill="none" stroke-linecap="${T.cap || 'round'}" stroke-linejoin="round" opacity="${T.op}"${s.tool === 'marker' ? ' style="mix-blend-mode:multiply"' : ''}/>`;
-  if (T.grain) return `<g fill="${s.c}" opacity="${T.op}"><path d="${outlinePath(s.pts, s.w, T.press, false, T.tilt)}" mask="url(#skgrainL)"/><path d="${outlinePath(s.pts, s.w, T.press, false, 0, coreK(s.pts))}" mask="url(#skgrain)"/></g>`;
+  if (T.grain) return `<g fill="${s.c}" opacity="${T.op}"><path d="${outlinePath(s.pts, s.w, T.press, false, T.tilt, () => 1.4)}" mask="url(#skgrainF)"/><path d="${outlinePath(s.pts, s.w, T.press, false, T.tilt)}" mask="url(#skgrainL)"/><path d="${outlinePath(s.pts, s.w, T.press, false, 0, coreK(s.pts))}" mask="url(#skgrain)"/></g>`;
   return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${T.op}"/>`;
 }
-// Pencil: graphite only marks the raised tooth of the paper. Each stroke is two layers on the same paper
-// grain: the full width with sparse grain (#skgrainL, the speckled edge) and a core with dense grain
-// (#skgrain). The core's width follows pressure and fades over the first 25% and last 15% of the stroke,
+// Pencil: graphite only marks the raised tooth of the paper. Each stroke is three layers on the same paper
+// grain: a fringe 1.4 times the width with very sparse grain (#skgrainF, stray specks, so the edge breaks up
+// instead of ending on a clean curve), the full width with sparse grain (#skgrainL) and a core with dense
+// grain (#skgrain). The core's width follows pressure and fades over the first 25% and last 15% of the stroke,
 // so light pressure and the ends leave only speckle and hard pressure lays down a dark centre. Tilt
 // broadens only the outer layer, so shading on the side of the lead is wide and light.
 const coreK = pts => (i, n) => n < 3 ? .6 : .85 * clamp(((pts[i][2] ?? .5) - .1) / .5, 0, 1) * Math.min(1, i / (n * .25), (n - 1 - i) / (n * .15));
 // The grain tile: paper fibre. Short strands at random angles, some lighter and some darker than the
 // paper, drawn on a canvas and wrapped at the edges so the tile repeats without a seam, then thresholded at
 // a given coverage. Fibres, not dot noise: thresholded dot noise reads as pixels or camouflage, not
-// graphite. Both masks come from the same tile, so the sparse edge's specks are a subset of the core's.
+// graphite. All three masks come from the same tile, so sparser layers' specks are a subset of denser ones'.
 // The patterns are in page units, so the grain stays put under the page and overlapping strokes darken
 // the same grains. One pair of masks serves every SVG in the document (canvas and thumbnails), so it is
 // added once at start-up.
@@ -999,7 +1000,7 @@ function grainDefs() {
     cx.putImageData(img, 0, 0); return c.toDataURL();
   };
   const def = (id, cover) => `<pattern id="${id}p" patternUnits="userSpaceOnUse" width="${N * S}" height="${N * S}"><image href="${tile(cover)}" width="${N * S}" height="${N * S}"/></pattern><mask id="${id}"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#${id}p)"/></mask>`;
-  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs>${def('skgrain', .8)}${def('skgrainL', .5)}</defs></svg>`);
+  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs>${def('skgrain', .8)}${def('skgrainL', .5)}${def('skgrainF', .15)}</defs></svg>`);
 }
 function redrawSketch() { const svg = $('#sketch'); if (svg) svg.innerHTML = (pg().sketch || []).map(strokeSVG).join(''); }
 function pushUndo() { const o = cur(); ui.skUndo.push(clone(pg().sketch || [])); if (ui.skUndo.length > 60) ui.skUndo.shift(); ui.skRedo = []; }

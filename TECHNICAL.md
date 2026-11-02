@@ -279,19 +279,20 @@ tool, remembers the last non-eraser tool in `ui.sk.prev`, and collapses the row 
 ### Tools and strokes
 - Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
   tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
-- Pencil (`grain: true` in `TOOLS`): each stroke is a `<g>` of two outlines on paper grain. The outer
-  outline is the full pressure and tilt width under the sparse mask `#skgrainL` (50% coverage, the
-  speckled edge). The core is drawn without tilt, its width multiplied by `coreK()`: 0 below pressure 0.1,
+- Pencil (`grain: true` in `TOOLS`): each stroke is a `<g>` of three outlines on paper grain. The fringe is
+  1.4 times the pressure and tilt width under `#skgrainF` (15% coverage, stray specks), so the edge breaks
+  up rather than ending on the outline's clean curve. The edge layer is the full width under `#skgrainL`
+  (50% coverage). The core is drawn without tilt, its width multiplied by `coreK()`: 0 below pressure 0.1,
   rising to 0.85 at pressure 0.6, and fading in over the first 25% and out over the last 15% of the
   stroke. It sits under the dense mask `#skgrain` (80% coverage). Light pressure and stroke ends leave only
   speckle, hard pressure lays a dark centre, and a tilted Pencil broadens only the outer layer, so shading
   is wide and light.
 - Grain: `grainDefs()` runs once at start-up. It draws paper fibre on a 192 × 192 canvas: 9,000 seeded
   short strands (2–9px, random angle, lighter or darker than mid-grey), wrapped at the edges so the tile
-  repeats without a seam. Each mask is that tile thresholded at its coverage with a soft edge (both masks
-  come from the same tile, so the edge's specks are a subset of the core's). The tiles go into a hidden
-  `svg.skdefs` as patterns `#skgrainp` and `#skgrainLp`, one page unit per pixel, and luminance masks
-  `#skgrain` and `#skgrainL`. The patterns are in page units, so the grain is fixed to the page: strokes
+  repeats without a seam. Each mask is that tile thresholded at its coverage with a soft edge (all three
+  masks come from the same tile, so sparser layers' specks are a subset of denser ones'). The tiles go into a hidden
+  `svg.skdefs` as patterns `#skgrainp`, `#skgrainLp` and `#skgrainFp`, one page unit per pixel, and luminance
+  masks `#skgrain`, `#skgrainL` and `#skgrainF`. The patterns are in page units, so the grain is fixed to the page: strokes
   crossing a spot share its grains, and the grain scales with zoom like paper. The
   masks are in the document, not in `#sketch`, so home thumbnails use them too; a sketch copied out of
   the document as SVG would need the defs with it. A fill under a pencil outline stays solid. Nothing is
@@ -383,7 +384,7 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
 - Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; in Sketch mode a
   finger (CDP `Input.dispatchTouchEvent`) moves and resizes while the Pencil and mouse draw; `fingerDraws`
   lets a finger draw. A second finger cancels a drag; two- and three-finger taps undo and redo; pinch zooms
-  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a pencil stroke is a group of a `#skgrainL` edge and a `#skgrain` core, grainy in Chromium and WebKit, on the canvas and in the home thumbnail; pressure 0.15 leaves speckle only and 0.9 a dark centre, and the ends fade; a held rough
+  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a pencil stroke is a group of a `#skgrainF` fringe, a `#skgrainL` edge and a `#skgrain` core, with no clean outline at size 8, grainy in Chromium and WebKit, on the canvas and in the home thumbnail; pressure 0.15 leaves speckle only and 0.9 a dark centre, and the ends fade; a held rough
   box, circle and line snap, the same box without a hold and a held scribble do not; Make visual places a
   visual in the box; Fill fills a snapped box and a freehand loop, clears with the same colour, explains a
   tap on an open line, and undoes. Toolbar: collapsed by default, expands, a pick collapses it, the pin keeps

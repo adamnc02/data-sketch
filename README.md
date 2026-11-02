@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.2.1.**
+made to be added to an iPad Home Screen. **Status: 1.2.2.**
 
 ## Stack
 
