@@ -216,6 +216,7 @@ h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .tip div{display:flex;justify-content:space-between;gap:16px}
 .tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 .sketch{position:absolute;left:0;top:0;z-index:30;pointer-events:none;overflow:visible}
+.skdefs{position:absolute;width:0;height:0;overflow:hidden}
 .page.sketching,.page.sketching .vis{cursor:crosshair}
 .sktools{position:sticky;top:0;left:0;z-index:10;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;margin:0 auto 14px;width:max-content;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .sktools button{min-height:44px;min-width:44px;padding:0 10px}

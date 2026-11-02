@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -63,7 +63,7 @@ const FONTS = [["'Segoe UI', system-ui, sans-serif", 'Segoe UI'], ['Arial, Helve
 const BASE = { title: 'Sales overview', headerBg: '#1F3A5F', headerFg: '#FFFFFF', pageBg: '#F3F2F1', visualBg: '#FFFFFF', font: FONTS[0][0], palette: ['#118DFF', '#12239E', '#E66C37', '#6B007B', '#E044A7', '#744EC2'], radius: 4, border: false, borderColor: '#C8C6C4', shadow: false, dataLabels: false, axisLabels: true, legend: true, gridlines: true, tooltips: true, titleSize: 11, headerH: 60, showHeader: true, logo: null, pageW: 1280, pageH: 720 };
 const PAGE_SIZES = [[1280, 720, '16:9'], [1600, 900, '16:9 large'], [1600, 800, '2:1'], [960, 720, '4:3'], [816, 1056, 'Letter'], [320, 240, 'Tooltip']];
 const TOOLS = {
-  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .9, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
+  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .9, grain: true, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
   pen: { label: 'Pen', sizes: [1.5, 2.5, 4, 7], press: null, smooth: .6, op: 1, icon: '<g transform="rotate(45 12 12)"><path d="M12 22l-5-8.5c0-3 1-5 2-5.5h6c1 .5 2 2.5 2 5.5z"/><path d="M12 22v-7"/><circle cx="12" cy="13.5" r="1.4"/><path d="M9 8V3h6v5"/></g>' },
   brush: { label: 'Brush', sizes: [4, 8, 14, 24], press: [.12, 1.7], taper: true, tilt: 1.2, smooth: .5, op: 1, icon: '<path d="M10 14l8-10a2 2 0 013 2.5L13 16"/><path d="M9 14c-3 0-4 2-4 4 0 1-1 2-2 2 4 1 9 0 9-4z"/>' },
   marker: { label: 'Highlighter', sizes: [10, 16, 24, 34], press: null, smooth: .6, op: .35, cap: 'butt', icon: '<path d="M9 12l-5 5v3h3l5-5"/><path d="M8 11l7-7 5 5-7 7z"/>' },
@@ -964,8 +964,29 @@ function strokeSVG(s) {
   if (s.fill) return `<g><path d="${pathD(s.pts)}Z" fill="${s.fill}"/>${strokeSVG({ ...s, fill: null })}</g>`;
   const T = TOOLS[s.tool] || TOOLS.pen;
   if (!T.press) return `<path d="${pathD(s.pts)}" stroke="${s.c}" stroke-width="${s.w}" fill="none" stroke-linecap="${T.cap || 'round'}" stroke-linejoin="round" opacity="${T.op}"${s.tool === 'marker' ? ' style="mix-blend-mode:multiply"' : ''}/>`;
+  if (T.grain) return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${grainOp(s.pts)}" mask="url(#skgrain)"/>`;
   return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${T.op}"/>`;
 }
+// Pencil grain: graphite only marks the raised tooth of the paper. A seeded noise tile (fine grain over a
+// coarser tooth) is a luminance mask in page units, so the grain stays put under the page rather than
+// moving with each stroke, and overlapping strokes darken the same grains. One mask serves every SVG in
+// the document (canvas and thumbnails), so it is added once at start-up.
+function grainDefs() {
+  const N = 128, G = 16, c = document.createElement('canvas'); c.width = c.height = N;
+  const cx = c.getContext('2d'); if (!cx) return; const img = cx.createImageData(N, N);
+  let seed = 20261102; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const g = Array.from({ length: G * G }, rnd), at = (i, j) => g[(j % G) * G + i % G];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const u = i * G / N, v = j * G / N, i0 = Math.floor(u), j0 = Math.floor(v), fu = u - i0, fv = v - j0;
+    const tooth = at(i0, j0) * (1 - fu) * (1 - fv) + at(i0 + 1, j0) * fu * (1 - fv) + at(i0, j0 + 1) * (1 - fu) * fv + at(i0 + 1, j0 + 1) * fu * fv;
+    const k = clamp((.35 * tooth + .65 * rnd() - .05) * 1.7, 0, 1) * 255, o = (j * N + i) * 4;
+    img.data[o] = img.data[o + 1] = img.data[o + 2] = k; img.data[o + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs><pattern id="skgrainp" patternUnits="userSpaceOnUse" width="${N}" height="${N}"><image href="${c.toDataURL()}" width="${N}" height="${N}"/></pattern><mask id="skgrain"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#skgrainp)"/></mask></defs></svg>`);
+}
+// A pencil pressed lightly leaves less graphite: the stroke's darkness follows its average pressure.
+function grainOp(pts) { const n = pts.length; return Math.min(1, .6 + .45 * pts.reduce((t, p) => t + (p[2] ?? .5), 0) / n).toFixed(2); }
 function redrawSketch() { const svg = $('#sketch'); if (svg) svg.innerHTML = (pg().sketch || []).map(strokeSVG).join(''); }
 function pushUndo() { const o = cur(); ui.skUndo.push(clone(pg().sketch || [])); if (ui.skUndo.length > 60) ui.skUndo.shift(); ui.skRedo = []; }
 function skUndo() { if (!ui.skUndo.length) return; const o = cur(); ui.skRedo.push(clone(pg().sketch || [])); pg().sketch = ui.skUndo.pop(); redrawSketch(); renderSkTools(); save(); }
@@ -1452,4 +1473,5 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 /* ---------- start ---------- */
+grainDefs();
 load().then(renderHome).catch(err => { console.error(err); $('#app').innerHTML = `<div class="loading">DataSketch couldn’t start: ${esc(err.message)}</div>`; });

@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.2.0.**
+made to be added to an iPad Home Screen. **Status: 1.2.1.**
 
 ## Stack
 
@@ -44,7 +44,8 @@ offline once loaded.
 - **Sketch:** the **Sketch** button switches Apple Pencil from editing to drawing. In Sketch mode the Pencil
   (and a mouse) draws while a finger keeps selecting, moving and resizing visuals; "Finger draws in Sketch
   mode" lets a finger draw instead. Pencil, pen, brush, highlighter, fill and eraser; pressure-sensitive,
-  and the pencil and brush broaden when the Pencil is tilted past writing angle. Each drawing tool has its
+  and the pencil and brush broaden when the Pencil is tilted past writing angle. The pencil is grainy like
+  an HB pencil on paper, lighter when pressed lightly. Each drawing tool has its
   own sizes and a Stability slider (smoothing, 0–90), kept per device.
 - **Sketch toolbar:** colours, size, stability, undo, redo, Clear and Done. The current-tool button expands the
   brushes; picking one collapses them again unless the pin is on.

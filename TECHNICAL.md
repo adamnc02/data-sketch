@@ -279,6 +279,15 @@ tool, remembers the last non-eraser tool in `ui.sk.prev`, and collapses the row 
 ### Tools and strokes
 - Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
   tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
+- Pencil grain (`grain: true` in `TOOLS`): `grainDefs()` runs once at start-up, draws a seeded 128 × 128
+  noise tile (fine per-pixel noise over a coarser 16 × 16 "tooth") on a canvas, and adds a hidden
+  `svg.skdefs` holding pattern `#skgrainp` and luminance mask `#skgrain`. `strokeSVG()` gives every pencil
+  stroke `mask="url(#skgrain)"` and an opacity from its average pressure (`grainOp()`, 0.6 + 0.45 × mean,
+  at most 1). The pattern is in page units, so the grain is fixed to the page: strokes crossing the same
+  spot share its grains, and it scales with zoom like paper. The mask is in the document, not in
+  `#sketch`, so home thumbnails use it too; a sketch copied out of the document as SVG would need the
+  defs with it. A fill under a pencil outline stays solid. Nothing is stored: the grain is how pencil
+  strokes are drawn, so earlier sketches show it too.
 - Stability is an exponential moving average on the input points: each new point moves the stroke
   `1 - stability / 100` of the way towards the pointer. `stabOf(tool)` reads `ui.sk.stab[tool]`, falling back
   to the tool's built-in `smooth` (pencil 30, brush 50, pen and highlighter 60). At high values the line
@@ -362,7 +371,7 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
 - Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; in Sketch mode a
   finger (CDP `Input.dispatchTouchEvent`) moves and resizes while the Pencil and mouse draw; `fingerDraws`
   lets a finger draw. A second finger cancels a drag; two- and three-finger taps undo and redo; pinch zooms
-  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a held rough
+  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; pencil strokes carry `mask="url(#skgrain)"` and show grain in Chromium and WebKit, on the canvas and in the home thumbnail, and heavy pressure draws darker than light; a held rough
   box, circle and line snap, the same box without a hold and a held scribble do not; Make visual places a
   visual in the box; Fill fills a snapped box and a freehand loop, clears with the same colour, explains a
   tap on an open line, and undoes. Toolbar: collapsed by default, expands, a pick collapses it, the pin keeps
