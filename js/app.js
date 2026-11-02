@@ -63,7 +63,7 @@ const FONTS = [["'Segoe UI', system-ui, sans-serif", 'Segoe UI'], ['Arial, Helve
 const BASE = { title: 'Sales overview', headerBg: '#1F3A5F', headerFg: '#FFFFFF', pageBg: '#F3F2F1', visualBg: '#FFFFFF', font: FONTS[0][0], palette: ['#118DFF', '#12239E', '#E66C37', '#6B007B', '#E044A7', '#744EC2'], radius: 4, border: false, borderColor: '#C8C6C4', shadow: false, dataLabels: false, axisLabels: true, legend: true, gridlines: true, tooltips: true, titleSize: 11, headerH: 60, showHeader: true, logo: null, pageW: 1280, pageH: 720 };
 const PAGE_SIZES = [[1280, 720, '16:9'], [1600, 900, '16:9 large'], [1600, 800, '2:1'], [960, 720, '4:3'], [816, 1056, 'Letter'], [320, 240, 'Tooltip']];
 const TOOLS = {
-  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .9, grain: true, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
+  pencil: { label: 'Pencil', sizes: [2, 3, 5, 8], press: [.45, 1.15], tilt: 2.5, smooth: .3, op: .92, grain: true, icon: '<path d="M4 20l2-6L16 4l4 4L10 18z"/><path d="M14 6l4 4"/><path d="M6 14l4 4"/>' },
   pen: { label: 'Pen', sizes: [1.5, 2.5, 4, 7], press: null, smooth: .6, op: 1, icon: '<g transform="rotate(45 12 12)"><path d="M12 22l-5-8.5c0-3 1-5 2-5.5h6c1 .5 2 2.5 2 5.5z"/><path d="M12 22v-7"/><circle cx="12" cy="13.5" r="1.4"/><path d="M9 8V3h6v5"/></g>' },
   brush: { label: 'Brush', sizes: [4, 8, 14, 24], press: [.12, 1.7], taper: true, tilt: 1.2, smooth: .5, op: 1, icon: '<path d="M10 14l8-10a2 2 0 013 2.5L13 16"/><path d="M9 14c-3 0-4 2-4 4 0 1-1 2-2 2 4 1 9 0 9-4z"/>' },
   marker: { label: 'Highlighter', sizes: [10, 16, 24, 34], press: null, smooth: .6, op: .35, cap: 'butt', icon: '<path d="M9 12l-5 5v3h3l5-5"/><path d="M8 11l7-7 5 5-7 7z"/>' },
@@ -945,8 +945,8 @@ function libDown(e, b) {
 
 /* ---------- sketch ---------- */
 function pathD(pts) { const f = n => n.toFixed(1); if (pts.length < 2) return `M${f(pts[0][0])} ${f(pts[0][1])}l0.01 0`; let d = `M${f(pts[0][0])} ${f(pts[0][1])}`; for (let i = 1; i < pts.length - 1; i++) d += `Q${f(pts[i][0])} ${f(pts[i][1])} ${f((pts[i][0] + pts[i + 1][0]) / 2)} ${f((pts[i][1] + pts[i + 1][1]) / 2)}`; const l = pts[pts.length - 1]; return d + `L${f(l[0])} ${f(l[1])}`; }
-function outlinePath(pts, w, press, taper, tilt = 0) {
-  const [lo, hi] = press, f = n => n.toFixed(1), n = pts.length, rad = i => { let r = w * (lo + (hi - lo) * (pts[i][2] ?? .5)) / 2 * (1 + (pts[i][3] || 0) * tilt); if (taper) { const t = Math.min(i, n - 1 - i); r *= Math.min(1, .2 + t / 6); } return Math.max(.35, r); };
+function outlinePath(pts, w, press, taper, tilt = 0, k = null) {
+  const [lo, hi] = press, f = n => n.toFixed(1), n = pts.length, rad = i => { let r = w * (lo + (hi - lo) * (pts[i][2] ?? .5)) / 2 * (1 + (pts[i][3] || 0) * tilt); if (taper) { const t = Math.min(i, n - 1 - i); r *= Math.min(1, .2 + t / 6); } return k ? r * k(i, n) : Math.max(.35, r); };
   if (n < 2) { const r = rad(0), [x, y] = pts[0]; return `M${f(x - r)} ${f(y)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`; }
   const L = [], R = [];
   for (let i = 0; i < n; i++) {
@@ -964,30 +964,43 @@ function strokeSVG(s) {
   if (s.fill) return `<g><path d="${pathD(s.pts)}Z" fill="${s.fill}"/>${strokeSVG({ ...s, fill: null })}</g>`;
   const T = TOOLS[s.tool] || TOOLS.pen;
   if (!T.press) return `<path d="${pathD(s.pts)}" stroke="${s.c}" stroke-width="${s.w}" fill="none" stroke-linecap="${T.cap || 'round'}" stroke-linejoin="round" opacity="${T.op}"${s.tool === 'marker' ? ' style="mix-blend-mode:multiply"' : ''}/>`;
-  if (T.grain) return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${grainOp(s.pts)}" mask="url(#skgrain)"/>`;
+  if (T.grain) return `<g fill="${s.c}" opacity="${T.op}"><path d="${outlinePath(s.pts, s.w, T.press, false, T.tilt)}" mask="url(#skgrainL)"/><path d="${outlinePath(s.pts, s.w, T.press, false, 0, coreK(s.pts))}" mask="url(#skgrain)"/></g>`;
   return `<path d="${outlinePath(s.pts, s.w, T.press, T.taper, T.tilt)}" fill="${s.c}" opacity="${T.op}"/>`;
 }
-// Pencil grain: graphite only marks the raised tooth of the paper. A seeded noise tile (fine grain over a
-// weaker, coarser tooth), each grain S page units across so it still reads at Fit zoom, is a luminance mask
-// in page units, so the grain stays put under the page rather than moving with each stroke, and overlapping
-// strokes darken the same grains. One mask serves every SVG in the document (canvas and thumbnails), so it
-// is added once at start-up.
+// Pencil: graphite only marks the raised tooth of the paper. Each stroke is two layers on the same paper
+// grain: the full width with sparse grain (#skgrainL, the speckled edge) and a core with dense grain
+// (#skgrain). The core's width follows pressure and fades over the first 25% and last 15% of the stroke,
+// so light pressure and the ends leave only speckle and hard pressure lays down a dark centre. Tilt
+// broadens only the outer layer, so shading on the side of the lead is wide and light.
+const coreK = pts => (i, n) => n < 3 ? .6 : .85 * clamp(((pts[i][2] ?? .5) - .1) / .5, 0, 1) * Math.min(1, i / (n * .25), (n - 1 - i) / (n * .15));
+// The grain tile: paper fibre. Short strands at random angles, some lighter and some darker than the
+// paper, drawn on a canvas and wrapped at the edges so the tile repeats without a seam, then thresholded at
+// a given coverage. Fibres, not dot noise: thresholded dot noise reads as pixels or camouflage, not
+// graphite. Both masks come from the same tile, so the sparse edge's specks are a subset of the core's.
+// The patterns are in page units, so the grain stays put under the page and overlapping strokes darken
+// the same grains. One pair of masks serves every SVG in the document (canvas and thumbnails), so it is
+// added once at start-up.
 function grainDefs() {
-  const N = 128, G = 16, S = 3, c = document.createElement('canvas'); c.width = c.height = N;
-  const cx = c.getContext('2d'); if (!cx) return; const img = cx.createImageData(N, N);
+  const N = 192, S = 1, n = N * N, c = document.createElement('canvas'); c.width = c.height = N;
+  const cx = c.getContext('2d'); if (!cx) return;
   let seed = 20261102; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-  const g = Array.from({ length: G * G }, rnd), at = (i, j) => g[(j % G) * G + i % G];
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const u = i * G / N, v = j * G / N, i0 = Math.floor(u), j0 = Math.floor(v), fu = u - i0, fv = v - j0;
-    const tooth = at(i0, j0) * (1 - fu) * (1 - fv) + at(i0 + 1, j0) * fu * (1 - fv) + at(i0, j0 + 1) * (1 - fu) * fv + at(i0 + 1, j0 + 1) * fu * fv;
-    const k = clamp((.2 * tooth + .8 * rnd() - .18) * 2.2, 0, 1) * 255, o = (j * N + i) * 4;
-    img.data[o] = img.data[o + 1] = img.data[o + 2] = k; img.data[o + 3] = 255;
+  cx.fillStyle = '#808080'; cx.fillRect(0, 0, N, N);
+  for (let k = 0; k < 9000; k++) {
+    const x = rnd() * N, y = rnd() * N, a = rnd() * Math.PI, l = 2 + rnd() * 7, dx = Math.cos(a) * l / 2, dy = Math.sin(a) * l / 2, v = rnd() < .5 ? 0 : 255;
+    cx.strokeStyle = `rgba(${v},${v},${v},${(.12 + rnd() * .3).toFixed(2)})`; cx.lineWidth = .5 + rnd() * .7;
+    for (const ox of x < l ? [0, N] : x > N - l ? [0, -N] : [0]) for (const oy of y < l ? [0, N] : y > N - l ? [0, -N] : [0]) { cx.beginPath(); cx.moveTo(x - dx + ox, y - dy + oy); cx.lineTo(x + dx + ox, y + dy + oy); cx.stroke(); }
   }
-  cx.putImageData(img, 0, 0);
-  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs><pattern id="skgrainp" patternUnits="userSpaceOnUse" width="${N * S}" height="${N * S}"><image href="${c.toDataURL()}" width="${N * S}" height="${N * S}"/></pattern><mask id="skgrain"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#skgrainp)"/></mask></defs></svg>`);
+  const px = cx.getImageData(0, 0, N, N).data, g = new Float32Array(n);
+  for (let k = 0; k < n; k++) g[k] = px[4 * k] / 255 + (rnd() - .5) * .01;
+  const sorted = Float32Array.from(g).sort();
+  const tile = cover => {
+    const q = sorted[Math.round((1 - cover) * (n - 1))], img = cx.createImageData(N, N);
+    for (let k = 0; k < n; k++) { const v = clamp((g[k] - q) / .08 + .5, 0, 1) * 255; img.data[4 * k] = img.data[4 * k + 1] = img.data[4 * k + 2] = v; img.data[4 * k + 3] = 255; }
+    cx.putImageData(img, 0, 0); return c.toDataURL();
+  };
+  const def = (id, cover) => `<pattern id="${id}p" patternUnits="userSpaceOnUse" width="${N * S}" height="${N * S}"><image href="${tile(cover)}" width="${N * S}" height="${N * S}"/></pattern><mask id="${id}"><rect x="-1e5" y="-1e5" width="2e5" height="2e5" fill="url(#${id}p)"/></mask>`;
+  document.body.insertAdjacentHTML('beforeend', `<svg class="skdefs" width="0" height="0" aria-hidden="true"><defs>${def('skgrain', .8)}${def('skgrainL', .5)}</defs></svg>`);
 }
-// A pencil pressed lightly leaves less graphite: the stroke's darkness follows its average pressure.
-function grainOp(pts) { const n = pts.length; return Math.min(1, .6 + .45 * pts.reduce((t, p) => t + (p[2] ?? .5), 0) / n).toFixed(2); }
 function redrawSketch() { const svg = $('#sketch'); if (svg) svg.innerHTML = (pg().sketch || []).map(strokeSVG).join(''); }
 function pushUndo() { const o = cur(); ui.skUndo.push(clone(pg().sketch || [])); if (ui.skUndo.length > 60) ui.skUndo.shift(); ui.skRedo = []; }
 function skUndo() { if (!ui.skUndo.length) return; const o = cur(); ui.skRedo.push(clone(pg().sketch || [])); pg().sketch = ui.skUndo.pop(); redrawSketch(); renderSkTools(); save(); }

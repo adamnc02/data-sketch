@@ -279,16 +279,27 @@ tool, remembers the last non-eraser tool in `ui.sk.prev`, and collapses the row 
 ### Tools and strokes
 - Pencil and brush strokes are outlines whose width follows each point's pressure; the brush also
   tapers its ends. Pen and highlighter are plain lines of one width. The eraser removes whole strokes.
-- Pencil grain (`grain: true` in `TOOLS`): `grainDefs()` runs once at start-up, draws a seeded 128 × 128
-  noise tile (fine per-pixel noise over a weaker 16 × 16 "tooth") on a canvas, drawn 3 page units per
-  pixel (a 384-unit tile) so the grain is still visible at Fit zoom on the iPad, and adds a hidden
-  `svg.skdefs` holding pattern `#skgrainp` and luminance mask `#skgrain`. `strokeSVG()` gives every pencil
-  stroke `mask="url(#skgrain)"` and an opacity from its average pressure (`grainOp()`, 0.6 + 0.45 × mean,
-  at most 1). The pattern is in page units, so the grain is fixed to the page: strokes crossing the same
-  spot share its grains, and it scales with zoom like paper. The mask is in the document, not in
-  `#sketch`, so home thumbnails use it too; a sketch copied out of the document as SVG would need the
-  defs with it. A fill under a pencil outline stays solid. Nothing is stored: the grain is how pencil
-  strokes are drawn, so earlier sketches show it too.
+- Pencil (`grain: true` in `TOOLS`): each stroke is a `<g>` of two outlines on paper grain. The outer
+  outline is the full pressure and tilt width under the sparse mask `#skgrainL` (50% coverage, the
+  speckled edge). The core is drawn without tilt, its width multiplied by `coreK()`: 0 below pressure 0.1,
+  rising to 0.85 at pressure 0.6, and fading in over the first 25% and out over the last 15% of the
+  stroke. It sits under the dense mask `#skgrain` (80% coverage). Light pressure and stroke ends leave only
+  speckle, hard pressure lays a dark centre, and a tilted Pencil broadens only the outer layer, so shading
+  is wide and light.
+- Grain: `grainDefs()` runs once at start-up. It draws paper fibre on a 192 × 192 canvas: 9,000 seeded
+  short strands (2–9px, random angle, lighter or darker than mid-grey), wrapped at the edges so the tile
+  repeats without a seam. Each mask is that tile thresholded at its coverage with a soft edge (both masks
+  come from the same tile, so the edge's specks are a subset of the core's). The tiles go into a hidden
+  `svg.skdefs` as patterns `#skgrainp` and `#skgrainLp`, one page unit per pixel, and luminance masks
+  `#skgrain` and `#skgrainL`. The patterns are in page units, so the grain is fixed to the page: strokes
+  crossing a spot share its grains, and the grain scales with zoom like paper. The
+  masks are in the document, not in `#sketch`, so home thumbnails use them too; a sketch copied out of
+  the document as SVG would need the defs with it. A fill under a pencil outline stays solid. Nothing is
+  stored: this is how pencil strokes are drawn, so earlier sketches show it too.
+- 🚨 **The grain is fibre, not dot noise.** Thresholded dot noise reads as pixels when fine and as blocky
+  camouflage when coarse (several page units per pixel, or a strong low-frequency "tooth"). The fibres
+  must cover the whole tile: where flat grey shows through, the threshold falls inside it and turns its
+  noise back into dots.
 - Stability is an exponential moving average on the input points: each new point moves the stroke
   `1 - stability / 100` of the way towards the pointer. `stabOf(tool)` reads `ui.sk.stab[tool]`, falling back
   to the tool's built-in `smooth` (pencil 30, brush 50, pen and highlighter 60). At high values the line
@@ -372,7 +383,7 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
 - Sketch: Pencil-type input moves and resizes with Sketch off and draws with Sketch on; in Sketch mode a
   finger (CDP `Input.dispatchTouchEvent`) moves and resizes while the Pencil and mouse draw; `fingerDraws`
   lets a finger draw. A second finger cancels a drag; two- and three-finger taps undo and redo; pinch zooms
-  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; pencil strokes carry `mask="url(#skgrain)"` and show grain in Chromium and WebKit, on the canvas and in the home thumbnail, and heavy pressure draws darker than light; a held rough
+  and two fingers pan in both modes; a 70° tilt broadens the pencil and a 30° lean does not; a pencil stroke is a group of a `#skgrainL` edge and a `#skgrain` core, grainy in Chromium and WebKit, on the canvas and in the home thumbnail; pressure 0.15 leaves speckle only and 0.9 a dark centre, and the ends fade; a held rough
   box, circle and line snap, the same box without a hold and a held scribble do not; Make visual places a
   visual in the box; Fill fills a snapped box and a freehand loop, clears with the same colour, explains a
   tap on an open line, and undoes. Toolbar: collapsed by default, expands, a pick collapses it, the pin keeps
