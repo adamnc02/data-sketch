@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.3.2.**
+made to be added to an iPad Home Screen. **Status: 1.3.1.**
 
 ## Stack
 
@@ -27,9 +27,7 @@ offline once loaded.
 - **Report and page names:** a text box can show its own text, the **report name** (the wireframe's name,
   followed by a separator such as `|`) or the **page name**. A page-name box set to start after the report
   name sits one space after the separator, so the spacing either side of the `|` stays even as the name
-  changes. A text box or **button** can also show the name of page 1, 2, 3 and so on, so a page navigator in
-  a template lists each wireframe's own pages in order, and hides buttons for pages the wireframe doesn't
-  have. In the template they all show their sample text. Any text box can be set to **Upper case** and to
+  changes. In the template both show their sample text. Any text box can be set to **Upper case** and to
   **Wide spacing** (a space between the letters of each word and an em space between words and either side of
   the separator); the stored text keeps its own case and spacing.
 - **Canvas:** presets from 16:9 to Letter and Tooltip, or a custom size; Fit, 100, 75 and 50% zoom; a grid

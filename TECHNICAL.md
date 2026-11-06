@@ -96,13 +96,12 @@ showHeader, logo (data URL), pageW, pageH` (default 1280 × 720).
 
 Visual (`vDefaults()`): `id, type, x, y, w, h, title, titleAuto, dim, periods, sort, mid, m2, legend, mode,
 ref, drill, sStyle, slider, from, to, params, cf, label, icon, action, bmId, paramId, text, fontSize, bold,
-align, textColor, src, fit, notes, ov, hidden, bind, pnum, sep, follow, upper, wide, sub, cols, open`.
+align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, upper, wide, sub, cols, open`.
 
 - `type`: card, column, bar, line, area, donut, table, matrix, slicer, button, shape, text, image.
-- Text boxes: `bind` is `''` (its own `text`), `'report'` (the wireframe's name, then `sep`) or `'page'` (a
-  page's name: this page when `pnum` is 0, page `pnum` (1-based) otherwise); `follow: true` places a page-name box after the report-name box (§8). `upper` and `wide`
+- Text boxes: `bind` is `''` (its own `text`), `'report'` (the wireframe's name, then `sep`) or `'page'` (the
+  page's name); `follow: true` places a page-name box after the report-name box (§8). `upper` and `wide`
   change how the text is drawn (`textStyle()`), never the stored `text`.
-- Buttons: `bind: 'page'` shows page `pnum`'s name in place of `label`, so layout buttons form a page navigator.
 - Matrix: `dim` is the first row level and `sub` the further levels (up to three in all), `cols` the column
   field (`''`, a dimension id or a time key), `open` the expanded rows as paths of member keys
   (`'2'`, `'2/5'`).
@@ -157,9 +156,8 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   `periodKey()` picks the time field whose Periods shown sets the range (the column field, else a row
   level); `timeRange()` is shared with the other visuals. Slicers filter it; cross-highlights from other
   visuals filter it; it does not highlight others.
-- `bindText(list, o, p)` resolves bound text boxes and buttons before rendering, in `renderPage()` (template layout and
-  the page's own visuals) and in `thumb()`. It returns copies: the stored `text`, `label` and `x` are never changed.
-  In a wireframe, a box or button bound to a page number the wireframe does not have comes back hidden.
+- `bindText(list, o, p)` resolves bound text boxes before rendering, in `renderPage()` (template layout and
+  the page's own visuals) and in `thumb()`. It returns copies: the stored `text` and `x` are never changed.
 - Cross-highlight (`ui.hl = { src, dim, i }`): visuals on the same dimension fade the other members;
   column and bar visuals on other dimensions draw a highlighted portion; line, area, card, table and
   donut are filtered.
@@ -260,10 +258,6 @@ the template's settings, including canvas size. The Layers tab can hide the temp
 A text box's Shows option binds it to the report name or the page name. Choosing Report name on a box whose
 text ends in a separator (`Sales |`) moves the separator into `sep`. Choosing Page name when the page has a
 report-name box turns on Start after the report name (`follow`), and the X field is disabled while it is on.
-Which page picks this page or page N; a box showing page N never follows. A button's Shows option (Its own
-text, A page name) numbers a new page button one after the highest page button on the page, so adding
-buttons top to bottom gives pages 1, 2, 3. Renaming, adding, moving and deleting pages re-render the page so
-the navigator follows.
 A following box's left edge is computed at render:
 
 ```
