@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -126,7 +126,7 @@ function vDefaults(type, md) {
     type, title: '', titleAuto: true, dim, periods: D.isTime(dim) ? D.TIME_PERIODS[dim] : 12, sort: 'value', mid: md?.measures[0]?.id || '', m2: '', legend: '', mode: 'clustered',
     ref: 'none', drill: true, sStyle: 'list', slider: true, from: 12, to: 23, params: md ? md.measures.slice(0, 3).map(m => m.id) : [], cf: 'none',
     label: 'Button', icon: 'none', action: 'none', bmId: '', paramId: '', text: 'Text', fontSize: 16, bold: false, align: 'left', textColor: '#252423',
-    src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', sep: '', follow: false, upper: false, wide: false,
+    src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', pnum: 0, sep: '', follow: false, upper: false, wide: false,
     sub: type === 'matrix' && cat.length > 1 ? [pick(0)] : [], cols: '', open: type === 'matrix' ? ['0'] : []
   };
 }
@@ -150,7 +150,7 @@ function autoTitle(v) {
   return `${m}${m2} by ${dn}${lg}`;
 }
 const tTitle = v => v.titleAuto ? autoTitle(v) : v.title;
-const vName = v => v.type === 'text' ? `Text: ${v.bind === 'report' ? 'Report name' : v.bind === 'page' ? 'Page name' : trunc(v.text || '', 28)}` : v.type === 'image' ? 'Image' : v.type === 'button' ? `${v.label || (v.icon !== 'none' ? v.icon[0].toUpperCase() + v.icon.slice(1) : '') || 'Untitled'} button` : (tTitle(v) || TYPES[v.type].name);
+const vName = v => v.type === 'text' ? `Text: ${v.bind === 'report' ? 'Report name' : v.bind === 'page' ? (v.pnum ? `Page ${v.pnum} name` : 'Page name') : trunc(v.text || '', 28)}` : v.type === 'image' ? 'Image' : v.type === 'button' ? `${v.bind === 'page' ? `Page ${v.pnum} name` : v.label || (v.icon !== 'none' ? v.icon[0].toUpperCase() + v.icon.slice(1) : '') || 'Untitled'} button` : (tTitle(v) || TYPES[v.type].name);
 
 /* ---------- seed content ---------- */
 function logisticsModel() {
@@ -590,10 +590,13 @@ function renderPages() {
 function notesOrder() { return pg().visuals.filter(v => (v.notes || '').trim()).sort((a, b) => a.y - b.y || a.x - b.x); }
 function railHTML() { const list = notesOrder(); return `<aside class="rail" id="rail" style="min-height:${ph()}px;font-family:${cur().settings.font}"><h3>Notes</h3>${list.length ? `<ol>${list.map((v, i) => `<li><span class="pin">${i + 1}</span><div><b>${esc(vName(v))}</b><p>${esc(v.notes)}</p></div></li>`).join('')}</ol>` : '<p>No notes yet. Double-click a visual to add one.</p>'}</aside>`; }
 function renderRail() { const r = $('#rail'); if (r) r.outerHTML = railHTML(); }
-/* Text boxes can show the wireframe's name (bind 'report', followed by its separator) or the page's name (bind 'page').
+/* Text boxes can show the wireframe's name (bind 'report', followed by its separator) or a page's name (bind 'page':
+   this page with pnum 0, page N with pnum N). Buttons can show page N's name, so a page navigator built from layout
+   buttons lists the wireframe's pages; a button or box for a page the wireframe lacks is hidden.
    In a template they show their own text as a sample. A page-name box with `follow` starts one space after the
    report-name box's text ends, so the gap after the separator equals the gap before it, whatever the name's length. */
 let measureCtx = null;
+const pnumSel = (v, self) => F.sel('v', 'pnum', 'Which page', [...(self ? [[0, 'This page']] : []), ...Array.from({ length: Math.max(12, cur().pages?.length || 0) }, (_, i) => [i + 1, 'Page ' + (i + 1)])], v.pnum);
 function textW(str, v, font) {
   measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
   measureCtx.font = `${v.bold ? 700 : 400} ${v.fontSize}px ${font}`; return measureCtx.measureText(str).width;
@@ -607,21 +610,25 @@ function textStyle(str, v) {
   if (v.wide) t = t.split('\n').map(l => l.trim().split(/\s+/).map(w => [...w].join(' ')).join(EM_SPACE)).join('\n');
   return t;
 }
+const bindable = v => (v.type === 'text' || v.type === 'button') && v.bind;
 function bindText(list, o, p) {
-  if (!list.some(v => v.type === 'text' && v.bind)) return list;
+  if (!list.some(bindable)) return list;
   const wf = !!o.pages, font = o.settings.font, rep = list.find(v => v.type === 'text' && v.bind === 'report' && !v.hidden);
-  const txt = v => v.bind === 'report' ? (wf ? o.name : v.text) + (v.sep ? ' ' + v.sep : '') : v.bind === 'page' ? (wf && p ? p.name : v.text) : v.text;
+  const own = v => v.type === 'button' ? v.label : v.text;
+  const txt = v => v.bind === 'report' ? (wf ? o.name : v.text) + (v.sep ? ' ' + v.sep : '') : !wf ? own(v) : v.pnum ? o.pages[v.pnum - 1]?.name ?? '' : p ? p.name : own(v);
   return list.map(v => {
-    if (v.type !== 'text' || !v.bind) return v;
+    if (!bindable(v)) return v;
+    if (v.bind === 'page' && v.pnum && wf && !o.pages[v.pnum - 1]) return { ...v, hidden: true };
+    if (v.type === 'button') return { ...v, label: txt(v) };
     const r = { ...v, text: txt(v) };
-    if (v.bind === 'page' && v.follow && rep) {
+    if (v.bind === 'page' && !v.pnum && v.follow && rep) {
       const w = Math.min(textW(textStyle(txt(rep), rep), rep, font), rep.w - TXT_PAD * 2), start = rep.align === 'right' ? rep.x + rep.w - TXT_PAD - w : rep.align === 'center' ? rep.x + (rep.w - w) / 2 : rep.x + TXT_PAD;
       r.x = start + w + textW(rep.wide ? EM_SPACE : ' ', rep, font) - TXT_PAD;
     }
     return r;
   });
 }
-const hasBound = list => !!list?.some(v => v.type === 'text' && v.bind);
+const hasBound = list => !!list?.some(bindable);
 function renderPage() {
   const o = cur(), p = pg(), s = o.settings, g = o.grid, side = o.notesMode === 'side', pins = {};
   if (side) notesOrder().forEach((v, i) => pins[v.id] = i + 1);
@@ -758,8 +765,8 @@ function sheetBody(v) {
   const hasDim = ['column', 'bar', 'line', 'area', 'donut', 'table', 'matrix'].includes(t) || (t === 'slicer' && ['list', 'tiles', 'dropdown'].includes(v.sStyle));
   const n = customCount(v);
   let h = '<section>';
-  if (t === 'button') h += `<h3>Button</h3>${F.text('v', 'label', 'Button text', v.label)}${F.sel('v', 'icon', 'Icon', [['none', 'None'], ['filter', 'Filter'], ['close', 'Close'], ['arrow', 'Arrow'], ['info', 'Info'], ['home', 'Home'], ['chart', 'Chart'], ['settings', 'Settings']], v.icon)}${ui.mode === 'tpl' ? '<p class="hint">Layout buttons are for show. Link bookmarks to buttons in a wireframe.</p>' : F.sel('v', 'target', 'On click', [['', 'Do nothing'], ...pg().bookmarks.map(b => [b.id, 'Bookmark: ' + b.name])], v.action === 'bookmark' ? v.bmId : '') + (pg().bookmarks.length ? '' : '<p class="hint">Add bookmarks in the Bookmarks tab, then choose one here.</p>')}`;
-  else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${F.sw('v', 'upper', 'Upper case', v.upper)}${F.sw('v', 'wide', 'Wide spacing', v.wide)}${v.wide ? '<p class="hint">A space between letters and an em space between words and around the separator.</p>' : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : 'Shows the name of the page.'}${v.bind === 'page' && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
+  if (t === 'button') h += `<h3>Button</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['page', 'A page name']], v.bind)}${v.bind === 'page' ? pnumSel(v, false) + `<p class="hint">Shows the name of page ${v.pnum}, and hides when the wireframe has fewer pages.${ui.mode === 'tpl' ? ' The button text shows here in the template.' : ''}</p>` : ''}${!v.bind || ui.mode === 'tpl' ? F.text('v', 'label', v.bind ? 'Sample text' : 'Button text', v.label) : ''}${F.sel('v', 'icon', 'Icon', [['none', 'None'], ['filter', 'Filter'], ['close', 'Close'], ['arrow', 'Arrow'], ['info', 'Info'], ['home', 'Home'], ['chart', 'Chart'], ['settings', 'Settings']], v.icon)}${ui.mode === 'tpl' ? '<p class="hint">Layout buttons are for show. Link bookmarks to buttons in a wireframe.</p>' : F.sel('v', 'target', 'On click', [['', 'Do nothing'], ...pg().bookmarks.map(b => [b.id, 'Bookmark: ' + b.name])], v.action === 'bookmark' ? v.bmId : '') + (pg().bookmarks.length ? '' : '<p class="hint">Add bookmarks in the Bookmarks tab, then choose one here.</p>')}`;
+  else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? pnumSel(v, true) : ''}${v.bind === 'page' && !v.pnum ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${F.sw('v', 'upper', 'Upper case', v.upper)}${F.sw('v', 'wide', 'Wide spacing', v.wide)}${v.wide ? '<p class="hint">A space between letters and an em space between words and around the separator.</p>' : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : v.pnum ? `Shows the name of page ${v.pnum}, and hides when the wireframe has fewer pages.` : 'Shows the name of the page.'}${v.bind === 'page' && !v.pnum && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
   else if (t === 'image') h += `<h3>Image</h3><div class="field"><span>Image file</span><div class="inline"><label class="filebtn">Upload<input type="file" accept="image/*" data-vimg></label>${v.src ? '<button data-act="imgclear">Remove</button>' : ''}</div></div>${F.sel('v', 'fit', 'Fit', [['contain', 'Fit inside'], ['cover', 'Fill and crop']], v.fit)}<p class="hint">Use this for client logos in page layouts.</p>`;
   else {
     h += `<h3>Fields</h3><label class="field stack"><span>Title${v.titleAuto ? '' : cus}</span><input type="text" data-v="title" value="${esc(v.titleAuto ? '' : v.title)}" placeholder="${esc(autoTitle(v) || 'No title')}"></label>`;
@@ -1446,7 +1453,7 @@ document.addEventListener('click', e => {
     case 'gopage': if (id !== pg().id) goPage(id); break;
     case 'addpage': addPage(); break;
     case 'pagemenu': pageDialog(); break;
-    case 'pagemove': { const ps = o.pages, i = ps.indexOf(pg()), j = i + +b.dataset.val; if (j < 0 || j >= ps.length) break; ps.splice(j, 0, ps.splice(i, 1)[0]); renderPages(); pageDialog(); save(); break; }
+    case 'pagemove': { const ps = o.pages, i = ps.indexOf(pg()), j = i + +b.dataset.val; if (j < 0 || j >= ps.length) break; ps.splice(j, 0, ps.splice(i, 1)[0]); renderPages(); if (hasBound(tplOf(o)?.visuals) || hasBound(pg().visuals)) renderPage(); pageDialog(); save(); break; }
     case 'pagedup': closeDlg(); dupPage(); toast('Page duplicated'); break;
     case 'pagedel': arm(b, 'Confirm delete', () => { const ps = o.pages, i = ps.indexOf(pg()); ps.splice(i, 1); closeDlg(); goPage(ps[Math.max(0, i - 1)].id); }); break;
     case 'flipback': flipOne(b.closest('.vis').dataset.id, false); break;
@@ -1576,10 +1583,13 @@ document.addEventListener('input', e => {
     else if (k === 'cols') { v.cols = t.value; if (D.isTime(t.value)) v.periods = D.TIME_PERIODS[t.value]; }
     else if (k === 'bind') {
       v.bind = t.value;
+      // A button showing a page name takes the next page number after the other page buttons.
+      if (v.type === 'button') v.pnum = v.bind ? (Math.max(0, ...pg().visuals.filter(x => x !== v && x.type === 'button' && x.bind === 'page').map(x => x.pnum)) + 1) : 0;
       // A report-name box keeps a trailing separator from its text ("Sales |") as its separator.
       const m = v.bind === 'report' && !v.sep && (v.text || '').match(/\s*([|•·–—\/-])\s*$/); if (m && m.index) { v.sep = m[1]; v.text = v.text.slice(0, m.index); }
       if (v.bind === 'page' && pg().visuals.some(x => x.type === 'text' && x.bind === 'report')) v.follow = true;
     }
+    else if (k === 'pnum') { v.pnum = +t.value; if (v.pnum) v.follow = false; }
     else if (k === 'title') { v.title = t.value; v.titleAuto = t.value.trim() === ''; }
     else if (k === 'target') { v.action = t.value ? 'bookmark' : 'none'; v.bmId = t.value; }
     else if (k === 'sStyle') { v.sStyle = t.value; const sz = SLICER_SIZES[t.value]; v.w = sz[0]; v.h = sz[1]; v.x = clamp(v.x, 0, pw() - v.w); v.y = clamp(v.y, 0, ph() - v.h); if (D.isTime(v.dim) || !v.dim) v.dim = model().dims[0]?.id || ''; delete ui.slicerSel[v.id]; }
