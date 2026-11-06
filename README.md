@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.2.2.**
+made to be added to an iPad Home Screen. **Status: 1.3.0.**
 
 ## Stack
 
@@ -24,12 +24,23 @@ offline once loaded.
   rest), canvas size, and a page layout built from shapes, text boxes, images and buttons. Wireframes copy
   the styling and canvas size when created (Apply copies them again) and show the template's layout live,
   locked, behind their visuals.
+- **Report and page names:** a text box can show its own text, the **report name** (the wireframe's name,
+  followed by a separator such as `|`) or the **page name**. A page-name box set to start after the report
+  name sits one space after the separator, so the spacing either side of the `|` stays even as the name
+  changes. In the template both show their sample text.
 - **Canvas:** presets from 16:9 to Letter and Tooltip, or a custom size; Fit, 100, 75 and 50% zoom; a grid
-  with snap; drag from the library or tap to add; move and resize from every edge.
-- **Visuals:** card, column, bar, line, area, donut, table, slicer (list, dropdown, tiles, date range, field
+  with snap; drag from the library or tap to add; move and resize from every edge, or type the X, Y, width
+  and height in the edit sheet.
+- **Keyboard:** Delete (or Backspace) deletes the selected visuals, with Undo in the message that follows.
+  The arrow keys nudge the selection: one grid step with snap on, 1px with it off.
+- **Visuals:** card, column, bar, line, area, donut, table, matrix, slicer (list, dropdown, tiles, date range, field
   parameter), button, shape, text box and image. With a visual selected, tapping another type in the
   library changes it after a confirmation. The library collapses to icons, and on wide screens (iPad
   landscape, desktop) the side panel button in the top bar hides the right panel to give the canvas more room.
+- **Matrix:** up to three row levels (dimensions, or Year, Quarter and Month) with + and − to expand and
+  collapse each group, Expand all and Collapse all, subtotals on every group and a grand total. With no
+  column field it shows the measure, last year and the change; with one (a dimension or a time level) it
+  shows the measure for each column member and a Total column.
 - **Multi-select:** Ctrl, Cmd or Shift + click, or **Select multiple** in the arrange bar on touch. Align
   left, centre, right, top, middle or bottom; distribute horizontally or vertically; drag the group.
 - **Pages:** a tab strip under the canvas. Each page has its own visuals, bookmarks and sketches; styling,
@@ -89,7 +100,8 @@ It lives in each template's and wireframe's settings. There is no fixed page siz
 Every visual of a measure then tells the same story and totals reconcile across visuals.
 
 ### Destructive actions confirm with a second tap (`arm()`), never `confirm()`.
-Full-backup import confirms in its own dialog.
+Full-backup import confirms in its own dialog. The Delete key is the one exception: it deletes at once and
+its message offers Undo.
 
 ### All user text goes through `esc()` before it is put into HTML.
 

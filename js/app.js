@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.3.0';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -35,6 +35,7 @@ const I = {
   line: ic('<path d="M3 17l5-6 4 3 4-7 5 4"/>'), area: ic('<path d="M3 19v-5l5-5 4 3 4-5 5 4v8z"/>'),
   donut: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 4v4.5"/>'),
   table: ic('<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M3 14h18M10 4v16"/>'),
+  matrix: ic('<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M10 4v16M13 13h5M13 16.5h5M5.5 12.5h2M6.5 11.5v2"/>'),
   slicer: ic('<rect x="4" y="5" width="4" height="4"/><rect x="4" y="15" width="4" height="4"/><path d="M11 7h9M11 17h9"/>'),
   button: ic('<rect x="3" y="7" width="18" height="10" rx="5"/><path d="M9 12h6"/>'),
   shape: ic('<rect x="4" y="4" width="16" height="16" rx="2"/>'), text: ic('<path d="M5 6h14M12 6v13"/>'),
@@ -50,11 +51,11 @@ const BRAND = `<span class="brand"><img class="mark lt" src="icons/mark-96.png" 
 const TYPES = {
   card: { name: 'Card', w: 300, h: 105 }, column: { name: 'Column chart', w: 405, h: 255 }, bar: { name: 'Bar chart', w: 405, h: 255 },
   line: { name: 'Line chart', w: 600, h: 255 }, area: { name: 'Area chart', w: 600, h: 255 }, donut: { name: 'Donut chart', w: 300, h: 255 },
-  table: { name: 'Table', w: 450, h: 255 }, slicer: { name: 'Slicer', w: 210, h: 255 }, button: { name: 'Button', w: 135, h: 45 },
+  table: { name: 'Table', w: 450, h: 255 }, matrix: { name: 'Matrix', w: 510, h: 300 }, slicer: { name: 'Slicer', w: 210, h: 255 }, button: { name: 'Button', w: 135, h: 45 },
   shape: { name: 'Shape', w: 300, h: 300 }, text: { name: 'Text box', w: 300, h: 45 }, image: { name: 'Image', w: 150, h: 60 }
 };
 const MULTI = ['column', 'bar', 'line', 'area'];
-const DATA_TYPES = ['card', 'column', 'bar', 'line', 'area', 'donut', 'table'];
+const DATA_TYPES = ['card', 'column', 'bar', 'line', 'area', 'donut', 'table', 'matrix'];
 const LAYOUT_TYPES = ['shape', 'text', 'image', 'button'];
 const SLICER_SIZES = { list: [210, 255], dropdown: [210, 75], tiles: [405, 75], date: [300, 120], param: [405, 75] };
 const HIER = ['T:Year', 'T:Quarter', 'T:Month'];
@@ -120,12 +121,13 @@ const dimKeyName = k => model() ? D.dimName(model(), k) : '';
 
 function vDefaults(type, md) {
   const cat = md ? md.dims.map(d => d.id) : [], pick = i => cat[i] ?? cat[0] ?? 'T:Month';
-  const dim = { column: pick(0), bar: pick(1), line: 'T:Month', area: 'T:Month', donut: pick(4), table: pick(2), slicer: pick(1) }[type] || '';
+  const dim = { column: pick(0), bar: pick(1), line: 'T:Month', area: 'T:Month', donut: pick(4), table: pick(2), matrix: pick(1), slicer: pick(1) }[type] || '';
   return {
     type, title: '', titleAuto: true, dim, periods: D.isTime(dim) ? D.TIME_PERIODS[dim] : 12, sort: 'value', mid: md?.measures[0]?.id || '', m2: '', legend: '', mode: 'clustered',
     ref: 'none', drill: true, sStyle: 'list', slider: true, from: 12, to: 23, params: md ? md.measures.slice(0, 3).map(m => m.id) : [], cf: 'none',
     label: 'Button', icon: 'none', action: 'none', bmId: '', paramId: '', text: 'Text', fontSize: 16, bold: false, align: 'left', textColor: '#252423',
-    src: null, fit: 'contain', notes: '', ov: {}, hidden: false
+    src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', sep: '', follow: false,
+    sub: type === 'matrix' && cat.length > 1 ? [pick(0)] : [], cols: '', open: type === 'matrix' ? ['0'] : []
   };
 }
 function mkPage(name, ex = {}) { return { id: uid(), name, visuals: [], bookmarks: [], activeBm: '', sketch: [], ...ex }; }
@@ -140,6 +142,7 @@ function autoTitle(v) {
     case 'card': return m;
     case 'slicer': return v.sStyle === 'param' ? 'Measure' : v.sStyle === 'date' ? 'Date' : dn;
     case 'button': case 'shape': case 'text': case 'image': return '';
+    case 'matrix': return `${m} by ${mxLevels(v).map(dimKeyName).join(' and ') || 'item'}${mxCols(v) ? ` and ${dimKeyName(v.cols)}` : ''}`;
   }
   let m2 = '';
   if (v.m2 && MULTI.includes(v.type) && v.type !== 'bar') m2 = v.m2 === 'ly' ? ' and last year' : v.m2 === 'bud' ? ' and budget' : measOf(v.m2) ? ` and ${measOf(v.m2).name}` : '';
@@ -147,7 +150,7 @@ function autoTitle(v) {
   return `${m}${m2} by ${dn}${lg}`;
 }
 const tTitle = v => v.titleAuto ? autoTitle(v) : v.title;
-const vName = v => v.type === 'text' ? `Text: ${trunc(v.text || '', 28)}` : v.type === 'image' ? 'Image' : v.type === 'button' ? `${v.label || (v.icon !== 'none' ? v.icon[0].toUpperCase() + v.icon.slice(1) : '') || 'Untitled'} button` : (tTitle(v) || TYPES[v.type].name);
+const vName = v => v.type === 'text' ? `Text: ${v.bind === 'report' ? 'Report name' : v.bind === 'page' ? 'Page name' : trunc(v.text || '', 28)}` : v.type === 'image' ? 'Image' : v.type === 'button' ? `${v.label || (v.icon !== 'none' ? v.icon[0].toUpperCase() + v.icon.slice(1) : '') || 'Untitled'} button` : (tTitle(v) || TYPES[v.type].name);
 
 /* ---------- seed content ---------- */
 function logisticsModel() {
@@ -226,13 +229,7 @@ function computeV(v) {
   }
   const fAll = { ...filters };
   if (hlMode === 'filter') fAll[hl.dim] = [hl.i];
-  const time = D.isTime(v.dim);
-  let range;
-  if (time) {
-    const per = clamp(v.periods || D.TIME_PERIODS[v.dim], 1, D.TIME_MAX[v.dim]), end = dr ? dr[1] : D.N_MONTHS - 1;
-    let start = v.dim === 'T:Month' ? end - per + 1 : v.dim === 'T:Quarter' ? (Math.floor(end / 3) - per + 1) * 3 : (Math.floor(end / 12) - per + 1) * 12;
-    range = [Math.max(dr ? dr[0] : 0, start, 0), end];
-  } else range = dr || [D.N_MONTHS - 12, D.N_MONTHS - 1];
+  const time = D.isTime(v.dim), range = time ? timeRange(v.dim, v.periods, dr) : dr || [D.N_MONTHS - 12, D.N_MONTHS - 1];
   const axis = v.type === 'card' ? null : (v.dim || null), legend = MULTI.includes(v.type) && v.legend && v.legend !== v.dim ? v.legend : null;
   const q = (measure, variant, f, ax = axis, lg = legend) => D.query(md, { measure, variant, axis: ax, legend: lg, filters: f || fAll, range });
   const main = q(mid, 'base');
@@ -265,6 +262,60 @@ function computeV(v) {
   };
   ui.vdata.set(v.id, data);
   return data;
+}
+// The months a time axis shows: the last `periods` years, quarters or months up to the end of the date range.
+function timeRange(key, periods, dr) {
+  const per = clamp(periods || D.TIME_PERIODS[key], 1, D.TIME_MAX[key]), end = dr ? dr[1] : D.N_MONTHS - 1;
+  const start = key === 'T:Month' ? end - per + 1 : key === 'T:Quarter' ? (Math.floor(end / 3) - per + 1) * 3 : (Math.floor(end / 12) - per + 1) * 12;
+  return [Math.max(dr ? dr[0] : 0, start, 0), end];
+}
+/* Matrix: rows are a hierarchy of up to three fields (dimensions or Year, Quarter, Month), with an optional field across
+   the columns. Each row is its own query filtered to its members (a time member narrows the month range), so every
+   subtotal is the engine's total for that slice and reconciles with the other visuals. */
+const MX_LEVELS = 3;
+function mxLevels(v) { const md = model(), ok = k => D.isTime(k) || md?.dims.some(d => d.id === k); return [v.dim, ...(v.sub || [])].filter((k, i, a) => k && ok(k) && a.indexOf(k) === i).slice(0, MX_LEVELS); }
+function mxCols(v) { return v.cols && !mxLevels(v).includes(v.cols) && (D.isTime(v.cols) || model()?.dims.some(d => d.id === v.cols)) ? v.cols : ''; }
+// The time field whose "Periods shown" sets a visual's month range: the axis, or for a matrix the columns, else a row level.
+function periodKey(v) { if (v.type !== 'matrix') return D.isTime(v.dim) ? v.dim : ''; const c = mxCols(v); return D.isTime(c) ? c : mxLevels(v).find(D.isTime) || ''; }
+function narrow(key, k, f, r) {
+  if (!D.isTime(key)) return [{ ...f, [key]: [k] }, r];
+  const lo = key === 'T:Year' ? k * 12 : key === 'T:Quarter' ? k * 3 : k, hi = key === 'T:Year' ? lo + 11 : key === 'T:Quarter' ? lo + 2 : lo;
+  return [f, [Math.max(r[0], lo), Math.min(r[1], hi)]];
+}
+function computeMatrix(v) {
+  const md = model(), mid = mOf(v), meas = measOf(mid), levels = mxLevels(v);
+  if (!meas || !levels.length) return null;
+  const dr = dateRange(), fAll = slicerFilters(v.id), hl = ui.hl, pk = periodKey(v), cols = mxCols(v);
+  if (hl && hl.src !== v.id) { const src = findV(hl.src); if (!src || src.hidden) ui.hl = null; else fAll[hl.dim] = [hl.i]; }
+  const range = pk ? timeRange(pk, v.periods, dr) : dr || [D.N_MONTHS - 12, D.N_MONTHS - 1];
+  const q = (variant, f, r, axis) => D.query(md, { measure: mid, variant, axis, filters: f, range: r });
+  const head = cols ? q('base', fAll, range, cols) : null;
+  // A row's cells: one per column member plus its total, or the measure and last year when there are no columns.
+  const cells = (f, r) => {
+    const tot = q('base', f, r, null).series[0].vals[0];
+    if (!cols) return [tot, q('ly', f, r, null).series[0].vals[0]];
+    const res = q('base', f, r, cols), at = new Map(res.keys.map((k, i) => [k, res.series[0].vals[i]]));
+    return [...head.keys.map(k => at.has(k) ? at.get(k) : null), tot];
+  };
+  const open = new Set(v.open || []);
+  const build = (lv, f, r, path) => {
+    const key = levels[lv], res = q('base', f, r, key), vals = res.series[0].vals;
+    let idx = res.keys.map((_, i) => i);
+    if (!D.isTime(key)) { if (f[key]) idx = idx.filter(i => f[key].includes(res.keys[i])); if (v.sort === 'value') idx.sort((a, b) => (vals[b] || 0) - (vals[a] || 0)); }
+    return idx.map(i => {
+      const k = res.keys[i], p = path ? `${path}/${k}` : String(k), [f2, r2] = narrow(key, k, f, r), kids = lv < levels.length - 1, on = kids && open.has(p);
+      return { label: res.labels[i], path: p, lv, kids, open: on, vals: cells(f2, r2), children: on ? build(lv + 1, f2, r2, p) : [] };
+    });
+  };
+  return { meas, fmt: x => D.fmtValue(x, meas, md.currency || '£'), levels, cols, colLabels: head ? head.labels : null, rows: build(0, fAll, range, ''), total: cells(fAll, range) };
+}
+// Every row path that has children, for Expand all.
+function mxAllPaths(v) {
+  const out = [], walk = rows => rows.forEach(r => { if (r.kids) { out.push(r.path); walk(r.children); } });
+  const all = { ...v, open: [] }, md = computeMatrix(all); if (!md) return out;
+  // Expanding level by level reaches every parent row.
+  for (let lv = 0; lv < md.levels.length - 1; lv++) { all.open = out.slice(); out.length = 0; walk(computeMatrix(all).rows); }
+  return out;
 }
 function niceMax(m) { if (!(m > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(m))); const f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
 function op(v, key, d) { const h = ui.hl; if (!h || !d || d.hlMode !== 'fade') return 1; return v.dim === h.dim && key !== h.i ? .28 : 1; }
@@ -378,10 +429,13 @@ function svgDonut(v, S, W, H, d) {
   if (lw) { const lh = 16, y0 = Math.max(4, cy - vals.length * lh / 2); vals.forEach((_, i) => { o += `<rect x="${W - lw + 4}" y="${y0 + i * lh}" width="8" height="8" rx="4" fill="${S.palette[i % S.palette.length]}"/><text x="${W - lw + 16}" y="${y0 + i * lh + 8}">${esc(trunc(lab[i], Math.floor((lw - 16) / 6)))}</text>`; }); }
   return svgWrap(W, H, o);
 }
+// Change against last year: points for a percentage, the difference for another ratio, a percentage for a sum.
+function changeFns(d) {
+  const ratio = d.meas.type === 'ratio', chg = (a, b) => ratio ? (a - b) * (d.meas.fmt === 'percent' ? 100 : 1) : (b ? (a - b) / b * 100 : 0);
+  return [chg, (a, b) => { const c = chg(a, b); return ratio && d.meas.fmt === 'percent' ? `${c >= 0 ? '+' : ''}${c.toFixed(1)} pts` : ratio ? `${c >= 0 ? '+' : ''}${d.fmt(c)}` : `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`; }];
+}
 function htmlTable(v, S, d) {
-  const vals = d.series[0].vals, ly = d.ly || [], max = Math.max(...vals.map(x => x || 0)) || 1, bc = S.color || S.palette[0], ratio = d.meas.type === 'ratio';
-  const chg = (a, b) => ratio ? (a - b) * (d.meas.fmt === 'percent' ? 100 : 1) : (b ? (a - b) / b * 100 : 0);
-  const chgTxt = (a, b) => { const c = chg(a, b); return ratio && d.meas.fmt === 'percent' ? `${c >= 0 ? '+' : ''}${c.toFixed(1)} pts` : ratio ? `${c >= 0 ? '+' : ''}${d.fmt(c)}` : `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`; };
+  const vals = d.series[0].vals, ly = d.ly || [], max = Math.max(...vals.map(x => x || 0)) || 1, bc = S.color || S.palette[0], [chg, chgTxt] = changeFns(d);
   const rows = vals.map((val, i) => {
     const w = Math.round((val || 0) / max * 100), c = chg(val, ly[i]);
     const bar = v.cf === 'bars' ? ` style="background:linear-gradient(to right,${bc}55 ${w}%,transparent ${w}%)"` : '';
@@ -389,6 +443,14 @@ function htmlTable(v, S, d) {
     return `<tr data-i="${i}" style="opacity:${op(v, d.keys[i], d)}"><td>${esc(d.labels[i])}</td><td class="n"${bar}>${d.fmt(val)}</td><td class="n">${d.fmt(ly[i])}</td><td class="n">${icon}${chgTxt(val, ly[i])}</td></tr>`;
   }).join('');
   return `<div class="fill"><table class="vtab ${S.gridlines ? 'gl' : ''}"><thead><tr><th>${esc(dimKeyName(v.dim) || 'Item')}</th><th class="n">${esc(d.meas.name)}</th><th class="n">Last year</th><th class="n">Change</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td><td class="n">${d.fmt(d.tot)}</td><td class="n">${d.fmt(d.totLy)}</td><td class="n">${chgTxt(d.tot, d.totLy)}</td></tr></tfoot></table></div>`;
+}
+function htmlMatrix(v, S, d) {
+  const [, chgTxt] = changeFns(d), flat = [], walk = rows => rows.forEach(r => { flat.push(r); walk(r.children); });
+  walk(d.rows);
+  const nums = vals => d.cols ? vals.map(x => `<td class="n">${x == null ? '' : d.fmt(x)}</td>`).join('') : `<td class="n">${d.fmt(vals[0])}</td><td class="n">${d.fmt(vals[1])}</td><td class="n">${chgTxt(vals[0], vals[1])}</td>`;
+  const head = d.cols ? [...d.colLabels, 'Total'].map(l => `<th class="n">${esc(l)}</th>`).join('') : `<th class="n">${esc(d.meas.name)}</th><th class="n">Last year</th><th class="n">Change</th>`;
+  const rows = flat.map(r => `<tr class="${r.open ? 'mxopen' : ''}"><td class="mxl" style="padding-left:${6 + r.lv * 14}px">${r.kids ? `<button class="mxt" data-act="mxtog" data-id="${v.id}" data-path="${r.path}" aria-expanded="${r.open}" aria-label="${r.open ? 'Collapse' : 'Expand'} ${esc(r.label)}">${r.open ? '−' : '+'}</button>` : d.levels.length > 1 ? '<span class="mxs"></span>' : ''}${esc(r.label)}</td>${nums(r.vals)}</tr>`).join('');
+  return `<div class="fill"><table class="vtab mx ${S.gridlines ? 'gl' : ''}"><thead><tr><th>${esc(dimKeyName(d.levels[0]))}</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td>${nums(d.total)}</tr></tfoot></table></div>`;
 }
 function slicerMembers(v) { const dm = model()?.dims.find(x => x.id === v.dim); return dm ? D.memberNames(dm) : []; }
 function htmlSlicer(v) {
@@ -415,13 +477,14 @@ function frontHTML(v, S) {
   const bg = t === 'button' ? (S.color || S.palette[0]) : t === 'shape' ? (S.color || S.visualBg) : (t === 'text' || t === 'image') ? (S.color || 'transparent') : S.visualBg;
   let body = '';
   if (DATA_TYPES.includes(t)) {
-    const d = computeV(v);
+    const d = t === 'matrix' ? computeMatrix(v) : computeV(v);
     if (!d) body = '<div class="imgph">Choose a measure</div>';
     else switch (t) {
       case 'column': case 'line': case 'area': body = svgCart(v, S, W, H, d); break;
       case 'bar': body = svgBar(v, S, W, H, d); break;
       case 'donut': body = svgDonut(v, S, W, H, d); break;
       case 'table': body = htmlTable(v, S, d); break;
+      case 'matrix': body = htmlMatrix(v, S, d); break;
       case 'card': body = htmlCard(v, S, W, H, d); break;
     }
   } else switch (t) {
@@ -462,7 +525,7 @@ function thumbRects(list, S) {
     return `<rect x="${v.x}" y="${v.y}" width="${v.w}" height="${v.h}" rx="${v.ov && v.ov.radius !== undefined ? v.ov.radius : S.radius}" fill="${f}" ${v.type === 'text' ? '' : 'stroke="rgba(0,0,0,.12)" stroke-width="2"'}/>${v.type === 'text' ? `<rect x="${v.x + 4}" y="${v.y + v.h / 2 - 4}" width="${Math.max(0, Math.min(v.w - 8, (v.text || '').length * v.fontSize * .5))}" height="8" rx="4" fill="${v.textColor}" opacity=".5"/>` : ''}`;
   }).join('');
 }
-function thumb(o) { const s = o.settings, tpl = tplOf(o), p = o.pages ? o.pages[0] : o; return `<svg viewBox="0 0 ${s.pageW} ${s.pageH}" aria-hidden="true"><rect width="${s.pageW}" height="${s.pageH}" fill="${s.pageBg}"/>${s.showHeader !== false ? `<rect width="${s.pageW}" height="${s.headerH}" fill="${s.headerBg}"/>` : ''}${tpl && !o.hideLayout ? thumbRects(tpl.visuals, tpl.settings) : ''}${thumbRects(p.visuals, s)}${o.showSketch === false ? '' : (p.sketch || []).map(strokeSVG).join('')}</svg>`; }
+function thumb(o) { const s = o.settings, tpl = tplOf(o), p = o.pages ? o.pages[0] : o; return `<svg viewBox="0 0 ${s.pageW} ${s.pageH}" aria-hidden="true"><rect width="${s.pageW}" height="${s.pageH}" fill="${s.pageBg}"/>${s.showHeader !== false ? `<rect width="${s.pageW}" height="${s.headerH}" fill="${s.headerBg}"/>` : ''}${tpl && !o.hideLayout ? thumbRects(bindText(tpl.visuals, o, p), tpl.settings) : ''}${thumbRects(bindText(p.visuals, o, o.pages ? p : null), s)}${o.showSketch === false ? '' : (p.sketch || []).map(strokeSVG).join('')}</svg>`; }
 function renderHome() {
   clearQS(); closeRing(); hideHover();
   ui.view = 'home'; ui.wfId = null; ui.hl = null; $('#tip').hidden = true;
@@ -527,15 +590,39 @@ function renderPages() {
 function notesOrder() { return pg().visuals.filter(v => (v.notes || '').trim()).sort((a, b) => a.y - b.y || a.x - b.x); }
 function railHTML() { const list = notesOrder(); return `<aside class="rail" id="rail" style="min-height:${ph()}px;font-family:${cur().settings.font}"><h3>Notes</h3>${list.length ? `<ol>${list.map((v, i) => `<li><span class="pin">${i + 1}</span><div><b>${esc(vName(v))}</b><p>${esc(v.notes)}</p></div></li>`).join('')}</ol>` : '<p>No notes yet. Double-click a visual to add one.</p>'}</aside>`; }
 function renderRail() { const r = $('#rail'); if (r) r.outerHTML = railHTML(); }
+/* Text boxes can show the wireframe's name (bind 'report', followed by its separator) or the page's name (bind 'page').
+   In a template they show their own text as a sample. A page-name box with `follow` starts one space after the
+   report-name box's text ends, so the gap after the separator equals the gap before it, whatever the name's length. */
+let measureCtx = null;
+function textW(str, v, font) {
+  measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+  measureCtx.font = `${v.bold ? 700 : 400} ${v.fontSize}px ${font}`; return measureCtx.measureText(str).width;
+}
+const TXT_PAD = 6; // .vtext's side padding
+function bindText(list, o, p) {
+  if (!list.some(v => v.type === 'text' && v.bind)) return list;
+  const wf = !!o.pages, font = o.settings.font, rep = list.find(v => v.type === 'text' && v.bind === 'report' && !v.hidden);
+  const txt = v => v.bind === 'report' ? (wf ? o.name : v.text) + (v.sep ? ' ' + v.sep : '') : v.bind === 'page' ? (wf && p ? p.name : v.text) : v.text;
+  return list.map(v => {
+    if (v.type !== 'text' || !v.bind) return v;
+    const r = { ...v, text: txt(v) };
+    if (v.bind === 'page' && v.follow && rep) {
+      const w = Math.min(textW(txt(rep), rep, font), rep.w - TXT_PAD * 2), start = rep.align === 'right' ? rep.x + rep.w - TXT_PAD - w : rep.align === 'center' ? rep.x + (rep.w - w) / 2 : rep.x + TXT_PAD;
+      r.x = start + w + textW(' ', rep, font) - TXT_PAD;
+    }
+    return r;
+  });
+}
+const hasBound = list => !!list?.some(v => v.type === 'text' && v.bind);
 function renderPage() {
   const o = cur(), p = pg(), s = o.settings, g = o.grid, side = o.notesMode === 'side', pins = {};
   if (side) notesOrder().forEach((v, i) => pins[v.id] = i + 1);
   const tp = ui.mode === 'wf' ? tplOf(o) : null;
   $('#wrap').innerHTML = `<div class="page ${ui.sk.on ? 'sketching' : ''}" id="page" style="width:${pw()}px;height:${ph()}px;background:${s.pageBg};font-family:${s.font}">
  ${s.showHeader !== false ? `<div class="pghead" style="height:${s.headerH}px;background:${s.headerBg};color:${s.headerFg}">${s.logo ? `<img src="${s.logo}" alt="Client logo">` : '<span class="logoph">Logo</span>'}<span class="pgt">${esc(s.title)}</span><span class="pgr">Data as at [refresh date]</span></div>` : ''}
- ${tp && !o.hideLayout ? tp.visuals.map(v => layoutHTML(v, tp.settings)).join('') : ''}
+ ${tp && !o.hideLayout ? bindText(tp.visuals, o, p).map(v => layoutHTML(v, tp.settings)).join('') : ''}
  ${g.show ? `<div class="gridov" style="background-size:${g.size}px ${g.size}px"></div>` : ''}
- ${p.visuals.map(v => visHTML(v, pins[v.id])).join('')}<svg class="sketch" id="sketch" viewBox="0 0 ${pw()} ${ph()}" width="${pw()}" height="${ph()}" aria-hidden="true" ${o.showSketch === false ? 'style="display:none"' : ''}>${(p.sketch || []).map(strokeSVG).join('')}</svg></div>${side ? railHTML() : ''}`;
+ ${bindText(p.visuals, o, p).map(v => visHTML(v, pins[v.id])).join('')}<svg class="sketch" id="sketch" viewBox="0 0 ${pw()} ${ph()}" width="${pw()}" height="${ph()}" aria-hidden="true" ${o.showSketch === false ? 'style="display:none"' : ''}>${(p.sketch || []).map(strokeSVG).join('')}</svg></div>${side ? railHTML() : ''}`;
   fit();
 }
 function fit() {
@@ -660,11 +747,11 @@ function sheetBody(v) {
   const params = md ? pg().visuals.filter(x => x.type === 'slicer' && x.sStyle === 'param' && x.id !== v.id) : [];
   const dimOpts = (allowTime, exclude) => [...(allowTime ? [['T:Year', 'Year'], ['T:Quarter', 'Quarter'], ['T:Month', 'Month']] : []), ...md.dims.filter(d => d.id !== exclude).map(d => [d.id, d.name]), ['__newdim', 'New dimension…']];
   const measOpts = () => [...md.measures.map(m => [m.id, m.name]), ['__newm', 'New measure…']];
-  const hasDim = ['column', 'bar', 'line', 'area', 'donut', 'table'].includes(t) || (t === 'slicer' && ['list', 'tiles', 'dropdown'].includes(v.sStyle));
+  const hasDim = ['column', 'bar', 'line', 'area', 'donut', 'table', 'matrix'].includes(t) || (t === 'slicer' && ['list', 'tiles', 'dropdown'].includes(v.sStyle));
   const n = customCount(v);
   let h = '<section>';
   if (t === 'button') h += `<h3>Button</h3>${F.text('v', 'label', 'Button text', v.label)}${F.sel('v', 'icon', 'Icon', [['none', 'None'], ['filter', 'Filter'], ['close', 'Close'], ['arrow', 'Arrow'], ['info', 'Info'], ['home', 'Home'], ['chart', 'Chart'], ['settings', 'Settings']], v.icon)}${ui.mode === 'tpl' ? '<p class="hint">Layout buttons are for show. Link bookmarks to buttons in a wireframe.</p>' : F.sel('v', 'target', 'On click', [['', 'Do nothing'], ...pg().bookmarks.map(b => [b.id, 'Bookmark: ' + b.name])], v.action === 'bookmark' ? v.bmId : '') + (pg().bookmarks.length ? '' : '<p class="hint">Add bookmarks in the Bookmarks tab, then choose one here.</p>')}`;
-  else if (t === 'text') h += `<h3>Text</h3>${F.text('v', 'text', 'Text', v.text)}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
+  else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : 'Shows the name of the page.'}${v.bind === 'page' && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
   else if (t === 'image') h += `<h3>Image</h3><div class="field"><span>Image file</span><div class="inline"><label class="filebtn">Upload<input type="file" accept="image/*" data-vimg></label>${v.src ? '<button data-act="imgclear">Remove</button>' : ''}</div></div>${F.sel('v', 'fit', 'Fit', [['contain', 'Fit inside'], ['cover', 'Fill and crop']], v.fit)}<p class="hint">Use this for client logos in page layouts.</p>`;
   else {
     h += `<h3>Fields</h3><label class="field stack"><span>Title${v.titleAuto ? '' : cus}</span><input type="text" data-v="title" value="${esc(v.titleAuto ? '' : v.title)}" placeholder="${esc(autoTitle(v) || 'No title')}"></label>`;
@@ -673,9 +760,17 @@ function sheetBody(v) {
       if (params.length) h += F.sel('v', 'paramId', 'Measure comes from', [['', 'The measure above'], ...params.map(p => [p.id, 'Field parameter: ' + tTitle(p)])], v.paramId);
     }
     if (md && hasDim && t !== 'card') {
-      h += F.sel('v', 'dim', t === 'slicer' ? 'Field' : 'Axis', dimOpts(t !== 'slicer'), v.dim);
-      if (D.isTime(v.dim)) h += F.num('v', 'periods', 'Periods shown', v.periods, 1, D.TIME_MAX[v.dim]);
-      else if (t !== 'slicer' && !['line', 'area'].includes(t)) h += F.sel('v', 'sort', 'Sort', [['value', 'By value, highest first'], ['axis', 'By name']], v.sort);
+      h += F.sel('v', 'dim', t === 'slicer' ? 'Field' : t === 'matrix' ? 'Rows' : 'Axis', dimOpts(t !== 'slicer'), v.dim);
+      if (t === 'matrix') {
+        const used = mxLevels(v), fields = dimOpts(true).filter(([a]) => a !== '__newdim');
+        (v.sub || []).forEach((k, i) => h += F.sel('mxsub', i, `Rows, level ${i + 2}`, [['', 'Remove this level'], ...fields.filter(([a]) => a === k || !used.includes(a))], k));
+        if (used.length < MX_LEVELS && fields.some(([a]) => !used.includes(a))) h += `<button data-act="mxadd" style="margin:2px 0 8px">${I.plus}Add row level</button>`;
+        h += F.sel('v', 'cols', 'Columns', [['', 'None'], ...fields.filter(([a]) => !used.includes(a))], mxCols(v));
+        if (used.length > 1) h += `<div class="inline" style="margin:2px 0 8px"><button data-act="mxexp">Expand all</button><button data-act="mxcol">Collapse all</button></div>`;
+      }
+      const pk = periodKey(v);
+      if (pk) h += F.num('v', 'periods', 'Periods shown', v.periods, 1, D.TIME_MAX[pk]);
+      if ((t === 'matrix' || !pk) && t !== 'slicer' && !['line', 'area'].includes(t)) h += F.sel('v', 'sort', 'Sort', [['value', 'By value, highest first'], ['axis', 'By name']], v.sort);
     }
     if (md && multi) {
       if (t !== 'bar') h += F.sel('v', 'm2', t === 'column' ? 'Line measure (combo)' : 'Second measure', [['', 'None'], ['ly', 'Last year'], ['bud', 'Budget'], ...md.measures.map(m => [m.id, m.name])], v.m2);
@@ -695,11 +790,12 @@ function sheetBody(v) {
   if (t === 'table') h += `<section><h3>Conditional formatting</h3>${F.sel('v', 'cf', 'Format', [['none', 'None'], ['bars', 'Data bars'], ['icons', 'Change icons']], v.cf)}</section>`;
   h += `<section><h3>Styling</h3>`;
   if (multi || t === 'donut') { h += tri('dataLabels', 'Data labels'); if (multi) h += tri('axisLabels', 'Axis labels'); h += tri('legend', 'Legend'); }
-  if (multi || t === 'table') h += tri('gridlines', 'Gridlines');
+  if (multi || t === 'table' || t === 'matrix') h += tri('gridlines', 'Gridlines');
   if (multi || t === 'donut') h += tri('tooltips', 'Tooltips');
   h += tri('border', 'Border') + tri('shadow', 'Shadow') + `<label class="field"><span>Corner radius${o.radius !== undefined ? cus : ''}</span><input type="number" min="0" max="40" data-ovr value="${o.radius ?? ''}" placeholder="${s.radius}" style="width:80px"></label>`;
   if (['column', 'bar', 'line', 'area', 'card', 'button', 'shape', 'text', 'image'].includes(t)) h += `<div class="field"><label class="sw" style="margin:0"><input type="checkbox" role="switch" data-ovcon ${o.color ? 'checked' : ''}><span class="track"></span><span>${['button', 'shape'].includes(t) ? 'Custom fill' : ['text', 'image'].includes(t) ? 'Background' : 'Custom colour'}</span></label><input type="color" data-ovc value="${o.color || (['shape', 'text', 'image'].includes(t) ? s.visualBg : s.palette[0])}" ${o.color ? '' : 'disabled'} aria-label="Colour"></div>`;
-  h += `</section><section><h3>Arrange</h3><div class="acts"><button data-act="zfront">To front</button><button data-act="zfwd">Forward</button><button data-act="zbwd">Backward</button><button data-act="zback">To back</button></div>${F.sw('v', 'hidden', 'Hidden', v.hidden)}</section>
+  const pos = (k, label) => `<label class="field"><span>${label}</span><input type="number" data-pos="${k}" value="${v[k]}" min="${k === 'w' || k === 'h' ? 15 : 0}" max="4000" style="width:80px" ${k === 'x' && v.bind === 'page' && v.follow ? 'disabled' : ''}></label>`;
+  h += `</section><section><h3>Position and size (px)</h3>${pos('x', 'X')}${pos('y', 'Y')}${pos('w', 'Width')}${pos('h', 'Height')}${v.bind === 'page' && v.follow ? '<p class="hint">X follows the report name.</p>' : ''}</section><section><h3>Arrange</h3><div class="acts"><button data-act="zfront">To front</button><button data-act="zfwd">Forward</button><button data-act="zbwd">Backward</button><button data-act="zback">To back</button></div>${F.sw('v', 'hidden', 'Hidden', v.hidden)}</section>
  <section class="acts">${ui.mode === 'tpl' ? '' : '<button data-act="flipnote">Flip to notes</button>'}<button data-act="dup">Duplicate</button><button class="danger" data-act="del">Delete</button></section>
  <section><button class="wide" data-act="reset" ${n ? '' : 'disabled'}>Reset styling to canvas defaults${n ? ` (${n} custom)` : ''}</button><p class="hint">Clears this visual’s custom styling and title. Fields, notes and position are kept.</p></section>`;
   return h;
@@ -734,6 +830,7 @@ function freeSpot(w, h) {
 function addVisual(type, x, y) {
   const T = TYPES[type], p = x == null ? freeSpot(T.w, T.h) : { x: snapV(x), y: snapV(y) };
   const v = mkV(type, clamp(p.x, 0, pw() - T.w), clamp(p.y, 0, ph() - T.h), T.w, T.h, {}, model());
+  if (type === 'matrix') { const top = computeMatrix(v)?.rows[0]; v.open = top?.kids ? [top.path] : []; } // the first row shown, opened
   pg().visuals.push(v); renderPage(); openSheet(v.id); save();
 }
 function goPage(id) {
@@ -791,7 +888,40 @@ function applyBm(id, quiet) { const p = pg(), bm = p.bookmarks.find(b => b.id ==
 function moveZ(id, how) { const a = pg().visuals, i = a.findIndex(v => v.id === id); if (i < 0) return; const [v] = a.splice(i, 1); const j = how === 'front' ? a.length : how === 'back' ? 0 : how === 'fwd' ? Math.min(a.length, i + 1) : Math.max(0, i - 1); a.splice(j, 0, v); renderPage(); save(); }
 function addMeasure() { const m = D.newMeasure({ name: `Measure ${model().measures.length + 1}` }); model().measures.push(m); return m; }
 function addDim() { const d = D.newDim(`Dimension ${model().dims.length + 1}`, 5); model().dims.push(d); return d; }
-function toast(msg) { const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
+function toast(msg, act) {
+  const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
+  if (act) { const b = document.createElement('button'); b.textContent = act[0]; b.onclick = () => { el.remove(); act[1](); }; el.appendChild(b); }
+  document.body.appendChild(el); setTimeout(() => el.remove(), act ? 6000 : 2600);
+}
+const selIds = () => ui.multi.size ? [...ui.multi] : ui.sel ? [ui.sel] : [];
+// Removes visuals from the page and its bookmarks; returns a function that puts them back.
+function removeVisuals(ids) {
+  const p = pg(), before = { visuals: p.visuals.slice(), bookmarks: clone(p.bookmarks || []) };
+  p.visuals = p.visuals.filter(x => !ids.includes(x.id));
+  (p.bookmarks || []).forEach(bm => { bm.hidden = bm.hidden.filter(x => !ids.includes(x)); bm.affects = bm.affects.filter(x => !ids.includes(x)); });
+  ui.sel = null; ui.multi.clear(); if (ui.panel === 'visual') ui.panel = 'tab';
+  renderPage(); renderPanel(); renderArrange(); save();
+  return () => { Object.assign(p, before); if (ui.view === 'editor') { renderPage(); refreshSide(); } save(); };
+}
+// The Delete key deletes at once and offers Undo, so it needs no second press.
+function deleteKey() {
+  const ids = selIds(), vs = pg().visuals.filter(x => ids.includes(x.id)); if (!vs.length) return;
+  const undo = removeVisuals(ids);
+  toast(vs.length > 1 ? `Deleted ${vs.length} visuals` : `Deleted ${vName(vs[0])}`, ['Undo', undo]);
+}
+// Arrow keys: with snap on, a step lands on the next grid line; with snap off, it is 1px. A group moves together.
+function nudge(key) {
+  const ids = selIds(), vs = pg().visuals.filter(x => ids.includes(x.id)); if (!vs.length) return;
+  const g = cur().grid, ax = key === 'ArrowLeft' || key === 'ArrowRight' ? 'x' : 'y', sz = ax === 'x' ? 'w' : 'h', dir = key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1;
+  const lo = Math.min(...vs.map(v => v[ax])), hi = Math.max(...vs.map(v => v[ax] + v[sz]));
+  const to = g.snap ? (dir > 0 ? Math.floor(lo / g.size) + 1 : Math.ceil(lo / g.size) - 1) * g.size : lo + dir;
+  const d = clamp(to - lo, -lo, (ax === 'x' ? pw() : ph()) - hi); if (!d) return;
+  vs.forEach(v => { v[ax] += d; const el = document.querySelector(`.vis[data-id="${v.id}"]`); if (el) el.style[ax === 'x' ? 'left' : 'top'] = v[ax] + 'px'; });
+  if (cur().notesMode === 'side' || hasBound(vs)) renderPage();
+  syncPos(); save();
+}
+// Keeps the edit sheet's position fields in step after a drag, a nudge or a typed value.
+function syncPos() { const v = ui.panel === 'visual' && ui.sel ? findV(ui.sel) : null; if (v) document.querySelectorAll('[data-pos]').forEach(i => { if (document.activeElement !== i) i.value = v[i.dataset.pos]; }); }
 function download(name, text, type = 'text/csv') { const url = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); }
 
 /* ---------- pointer: canvas ---------- */
@@ -872,7 +1002,7 @@ document.addEventListener('pointerdown', e => {
   const up = () => {
     dragCancel = null;
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.classList.remove('dragging');
-    if (moved) { if (resize || cur().notesMode === 'side' || ui.dropOpen === v.id) renderPage(); save(); return; }
+    if (moved) { if (resize || cur().notesMode === 'side' || ui.dropOpen === v.id || hasBound(group ? group.map(g => g.v) : [v])) renderPage(); syncPos(); save(); return; }
     if (group) ui.multi.clear();
     clickVisual(v, target);
   };
@@ -1269,6 +1399,8 @@ function cleanupRefs() {
     if (v.mid && !mIds.includes(v.mid)) v.mid = mIds[0];
     if (v.m2 && !['ly', 'bud'].includes(v.m2) && !mIds.includes(v.m2)) v.m2 = '';
     v.params = (v.params || []).filter(id => mIds.includes(id));
+    if (v.sub?.length) v.sub = v.sub.filter(k => D.isTime(k) || dimIds.includes(k));
+    if (v.cols && !D.isTime(v.cols) && !dimIds.includes(v.cols)) v.cols = '';
   }
   md.measures.forEach(m => m.stories = (m.stories || []).filter(s => dimIds.includes(s.dim)));
   ui.slicerSel = {}; ui.hl = null;
@@ -1323,7 +1455,11 @@ document.addEventListener('click', e => {
     case 'gomeasure': ui.mOpen = mOf(v); showTab('data'); setTimeout(() => $(`details[data-mopen="${ui.mOpen}"]`)?.scrollIntoView({ block: 'start' }), 30); break;
     case 'flipnote': ui.panelOpen = false; $('#panel').classList.remove('open'); if (v.hidden) { v.hidden = false; renderPage(); } flipOne(v.id, true); break;
     case 'dup': { const g = o.grid.size, c = { ...clone(v), id: uid(), x: clamp(v.x + g * 2, 0, pw() - v.w), y: clamp(v.y + g * 2, 0, ph() - v.h) }; pg().visuals.push(c); renderPage(); openSheet(c.id); save(); break; }
-    case 'del': arm(b, 'Confirm delete', () => { pg().visuals = pg().visuals.filter(x => x.id !== v.id); (pg().bookmarks || []).forEach(bm => { bm.hidden = bm.hidden.filter(x => x !== v.id); bm.affects = bm.affects.filter(x => x !== v.id); }); ui.sel = null; ui.panel = 'tab'; renderPage(); renderPanel(); save(); }); break;
+    case 'del': arm(b, 'Confirm delete', () => removeVisuals([v.id])); break;
+    case 'mxtog': { const x = findV(id); if (!x) break; const s = new Set(x.open), pth = b.dataset.path; if (s.has(pth)) s.delete(pth); else s.add(pth); x.open = [...s]; renderPage(); save(); break; }
+    case 'mxadd': { const used = mxLevels(v), k = [...HIER, ...model().dims.map(d => d.id)].find(a => !used.includes(a) && a !== v.cols); if (!k) break; v.sub = [...used.slice(1), k]; renderPage(); renderPanel(`[data-mxsub="${v.sub.length - 1}"]`); save(); break; }
+    case 'mxexp': v.open = mxAllPaths(v); renderPage(); save(); break;
+    case 'mxcol': v.open = []; renderPage(); save(); break;
     case 'reset': v.ov = {}; v.titleAuto = true; v.title = ''; renderPage(); renderPanel(); save(); break;
     case 'zfront': case 'zfwd': case 'zbwd': case 'zback': moveZ(v.id, { zfront: 'front', zfwd: 'fwd', zbwd: 'bwd', zback: 'back' }[act]); break;
     case 'drillup': case 'drilldown': { const dv = findV(b.closest('.vis').dataset.id), hi = HIER.indexOf(dv.dim), ni = clamp(hi + (act === 'drillup' ? -1 : 1), 0, HIER.length - 1); dv.dim = HIER[ni]; dv.periods = D.TIME_PERIODS[dv.dim]; renderPage(); if (ui.panel === 'visual' && ui.sel === dv.id) renderPanel(); save(); break; }
@@ -1382,8 +1518,8 @@ document.addEventListener('input', e => {
     if (front && o.notesMode !== 'side') { const dot = front.querySelector('.hasnote'); if (v.notes.trim() && !dot) front.insertAdjacentHTML('beforeend', '<span class="hasnote" aria-hidden="true"></span>'); if (!v.notes.trim() && dot) dot.remove(); }
     if (o.notesMode === 'side') renderRail(); save(); return;
   }
-  if ('wfname' in ds) { if (ui.mode === 'tpl') o.client = t.value; else o.name = t.value; save(); return; }
-  if ('pgname' in ds) { pg().name = t.value; renderPages(); save(); return; }
+  if ('wfname' in ds) { if (ui.mode === 'tpl') o.client = t.value; else { o.name = t.value; if (hasBound(tplOf(o)?.visuals) || hasBound(pg().visuals)) renderPage(); } save(); return; }
+  if ('pgname' in ds) { pg().name = t.value; renderPages(); if (hasBound(tplOf(o)?.visuals) || hasBound(pg().visuals)) renderPage(); save(); return; }
   if ('bmname' in ds) { pg().bookmarks.find(b => b.id === ds.bmname).name = t.value; save(); return; }
   if ('bmv' in ds) {
     const bm = pg().bookmarks.find(b => b.id === ds.bmv); bm.hidden = bm.hidden.filter(x => x !== ds.vid); bm.affects = bm.affects.filter(x => x !== ds.vid);
@@ -1422,17 +1558,25 @@ document.addEventListener('input', e => {
   if ('dmem' in ds) { model().dims.find(d => d.id === ds.dmem).members = t.value; renderPage(); save(); return; }
   if ('cur' in ds) { model().currency = t.value; renderPage(); save(); return; }
   const v = ui.sel ? findV(ui.sel) : null; if (!v) return;
+  if ('mxsub' in ds) { const i = +ds.mxsub; if (t.value) v.sub[i] = t.value; else v.sub.splice(i, 1); if (v.cols === t.value) v.cols = ''; v.open = []; renderPage(); renderPanel(t.value ? `[data-mxsub="${i}"]` : '[data-v=dim]'); save(); return; }
   if ('pm' in ds) { v.params = v.params.filter(x => x !== ds.pm); if (t.checked) { const order = model().measures.map(m => m.id); v.params.push(ds.pm); v.params.sort((a, b) => order.indexOf(a) - order.indexOf(b)); } ui.paramSel[v.id] = 0; renderPage(); save(); return; }
   if ('v' in ds) {
     const k = ds.v;
     if (k === 'mid' && t.value === '__newm') { const m = addMeasure(); v.mid = m.id; renderPage(); ui.mOpen = m.id; showTab('data'); save(); setTimeout(() => $(`[data-mf=name][data-id="${m.id}"]`)?.select(), 30); return; }
     if (k === 'dim' && t.value === '__newdim') { const d = addDim(); v.dim = d.id; renderPage(); showTab('data'); save(); setTimeout(() => $(`[data-dname="${d.id}"]`)?.select(), 30); return; }
-    if (k === 'periods') { if (t.value === '') return; v.periods = clamp(parseInt(t.value) || 1, 1, D.TIME_MAX[v.dim] || 24); }
+    if (k === 'periods') { if (t.value === '') return; v.periods = clamp(parseInt(t.value) || 1, 1, D.TIME_MAX[periodKey(v)] || 24); }
+    else if (k === 'cols') { v.cols = t.value; if (D.isTime(t.value)) v.periods = D.TIME_PERIODS[t.value]; }
+    else if (k === 'bind') {
+      v.bind = t.value;
+      // A report-name box keeps a trailing separator from its text ("Sales |") as its separator.
+      const m = v.bind === 'report' && !v.sep && (v.text || '').match(/\s*([|•·–—\/-])\s*$/); if (m && m.index) { v.sep = m[1]; v.text = v.text.slice(0, m.index); }
+      if (v.bind === 'page' && pg().visuals.some(x => x.type === 'text' && x.bind === 'report')) v.follow = true;
+    }
     else if (k === 'title') { v.title = t.value; v.titleAuto = t.value.trim() === ''; }
     else if (k === 'target') { v.action = t.value ? 'bookmark' : 'none'; v.bmId = t.value; }
     else if (k === 'sStyle') { v.sStyle = t.value; const sz = SLICER_SIZES[t.value]; v.w = sz[0]; v.h = sz[1]; v.x = clamp(v.x, 0, pw() - v.w); v.y = clamp(v.y, 0, ph() - v.h); if (D.isTime(v.dim) || !v.dim) v.dim = model().dims[0]?.id || ''; delete ui.slicerSel[v.id]; }
     else if (k === 'from' || k === 'to') v[k] = +t.value;
-    else if (k === 'dim') { v.dim = t.value; if (D.isTime(v.dim)) v.periods = D.TIME_PERIODS[v.dim]; if (v.legend === v.dim) v.legend = ''; delete ui.slicerSel[v.id]; if (ui.hl && ui.hl.src === v.id) ui.hl = null; }
+    else if (k === 'dim') { v.dim = t.value; if (v.type === 'matrix') v.open = []; if (D.isTime(v.dim)) v.periods = D.TIME_PERIODS[v.dim]; if (v.legend === v.dim) v.legend = ''; delete ui.slicerSel[v.id]; if (ui.hl && ui.hl.src === v.id) ui.hl = null; }
     else v[k] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? v[k] : +t.value) : t.value;
     if (k === 'paramId' && t.value) ui.paramSel[t.value] = ui.paramSel[t.value] || 0;
     renderPage();
@@ -1449,6 +1593,11 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'zoom') { ui.zoom = t.value; fit(); syncZoom(); return; }
+  if (t.dataset.pos) {
+    const v = ui.sel ? findV(ui.sel) : null, k = t.dataset.pos, n = Math.round(+t.value); if (!v || t.value === '' || !isFinite(n)) return;
+    if (k === 'w') v.w = clamp(n, 15, pw() - v.x); else if (k === 'h') v.h = clamp(n, 15, ph() - v.y); else if (k === 'x') v.x = clamp(n, 0, pw() - v.w); else v.y = clamp(n, 0, ph() - v.h);
+    t.value = v[k]; renderPage(); save(); return;
+  }
   if (t.dataset.cs) { const s = cur().settings, k = t.dataset.cs; if (k === 'preset') { if (t.value !== 'custom') setSize(...t.value.split('x').map(Number)); return; } if (t.value === '') return; setSize(k === 'w' ? +t.value : s.pageW, k === 'h' ? +t.value : s.pageH); return; }
   const f = t.files && t.files[0]; if (!f) return;
   const r = new FileReader();
@@ -1463,7 +1612,10 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   const el = e.target;
   if (e.key === 'Escape' && ring) { closeRing(); return; }
-  if (e.key === 'Escape' && ui.view === 'editor' && (ui.sel || ui.multi.size) && !$('#dlg').open && !el.closest?.('input,textarea,select')) { clearSel(); return; }
+  const onCanvas = ui.view === 'editor' && (ui.sel || ui.multi.size) && !$('#dlg').open && !el.closest?.('input,textarea,select');
+  if (e.key === 'Escape' && onCanvas) { clearSel(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && onCanvas && !e.metaKey && !e.ctrlKey) { e.preventDefault(); deleteKey(); return; }
+  if (e.key.startsWith('Arrow') && onCanvas && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); nudge(e.key); return; }
   if (!el.classList || !el.classList.contains('vis') || el.classList.contains('locked')) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(el.dataset.id, true); }
 });

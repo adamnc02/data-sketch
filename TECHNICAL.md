@@ -96,9 +96,14 @@ showHeader, logo (data URL), pageW, pageH` (default 1280 × 720).
 
 Visual (`vDefaults()`): `id, type, x, y, w, h, title, titleAuto, dim, periods, sort, mid, m2, legend, mode,
 ref, drill, sStyle, slider, from, to, params, cf, label, icon, action, bmId, paramId, text, fontSize, bold,
-align, textColor, src, fit, notes, ov, hidden`.
+align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, sub, cols, open`.
 
-- `type`: card, column, bar, line, area, donut, table, slicer, button, shape, text, image.
+- `type`: card, column, bar, line, area, donut, table, matrix, slicer, button, shape, text, image.
+- Text boxes: `bind` is `''` (its own `text`), `'report'` (the wireframe's name, then `sep`) or `'page'` (the
+  page's name); `follow: true` places a page-name box after the report-name box (§8).
+- Matrix: `dim` is the first row level and `sub` the further levels (up to three in all), `cols` the column
+  field (`''`, a dimension id or a time key), `open` the expanded rows as paths of member keys
+  (`'2'`, `'2/5'`).
 - `dim` / `legend`: a dimension id, or a time key `'T:Year' | 'T:Quarter' | 'T:Month'`.
 - `mid`: measure id. `m2`: `''`, `'ly'` (last year), `'bud'` (budget) or another measure id.
 - `ov`: per-visual style overrides, keys in `OVK` (dataLabels, axisLabels, legend, gridlines, tooltips,
@@ -143,6 +148,15 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   column, line and area; `svgBar`; `svgDonut`); tables, slicers and cards are HTML.
 - `computeV(v)` resolves the context (slicer filters, date range, cross-highlight) and calls `query()`;
   results are cached in `ui.vdata` for tooltips.
+- `computeMatrix(v)` builds the matrix as a tree: each row is a `query()` filtered to its own members (a time
+  member narrows the month range instead, `narrow()`), so every subtotal is the engine's total for that slice
+  and a ratio's subtotal is Σnum / Σden, not a sum of rates. Rows only query their children when expanded.
+  Column cells are matched to the header by key, because a narrowed range returns only its own periods.
+  `periodKey()` picks the time field whose Periods shown sets the range (the column field, else a row
+  level); `timeRange()` is shared with the other visuals. Slicers filter it; cross-highlights from other
+  visuals filter it; it does not highlight others.
+- `bindText(list, o, p)` resolves bound text boxes before rendering, in `renderPage()` (template layout and
+  the page's own visuals) and in `thumb()`. It returns copies: the stored `text` and `x` are never changed.
 - Cross-highlight (`ui.hl = { src, dim, i }`): visuals on the same dimension fade the other members;
   column and bar visuals on other dimensions draw a highlighted portion; line, area, card, table and
   donut are filtered.
@@ -170,13 +184,18 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   style overrides, `data-mf` measure fields, `data-st` stories, `data-dname` / `data-dcount` /
   `data-dmem` dimensions, `data-cur` currency, `data-bmname` / `data-bmv` bookmarks, `data-g` grid,
   `data-k` wireframe flags, `data-l` layers option, `data-pal` palette, `data-pm` field-parameter
-  measures, `data-notes`, `data-wfname`, `data-pgname`. One `change` listener handles zoom, the canvas
-  size controls (`data-cs`, so a half-typed number never resizes the page), and file inputs
-  (`data-import`, `data-vimg`, `data-logo`).
+  measures, `data-mxsub` matrix row levels, `data-notes`, `data-wfname`, `data-pgname`. One `change`
+  listener handles zoom, the canvas size controls (`data-cs`) and the position fields (`data-pos`), so a
+  half-typed number never moves anything, and file inputs (`data-import`, `data-vimg`, `data-logo`).
+- One `keydown` listener: Escape closes the ring or clears the selection; with a selection and focus outside
+  any field or dialog, Delete or Backspace calls `deleteKey()` and the arrow keys call `nudge()`; Enter or
+  Space on a focused visual opens its edit sheet.
 - One `pointerdown` listener handles library drag (drag preview `.dragghost`), visual move and resize
   (8 handles, grid snap), click and double-click (click opens the edit sheet and runs interactions;
   double-click flips to notes), multi-select and sketching.
-- Destructive actions use `arm(btn, label, fn)`: the first tap changes the label, the second acts. Dialogs
+- Destructive actions use `arm(btn, label, fn)`: the first tap changes the label, the second acts. The
+  Delete key is the exception: `removeVisuals()` returns a function that restores the page's visuals and
+  bookmarks, and `deleteKey()` offers it as Undo in the toast (`toast(msg, [label, fn])`, 6 seconds). Dialogs
   use the single `<dialog id="dlg">`; `alert()` and `confirm()` are not used.
 - All user text goes through `esc()` when building HTML.
 - UI copy is British English, sentence case, plain verbs, no exclamation marks.
@@ -201,6 +220,21 @@ vertically (three or more; first and last stay, gaps become equal). `arrange(how
 selected visual moves the whole group, clamped so every member stays on the page; a plain click on one
 member selects just that visual.
 
+### Position and keyboard
+The edit sheet's Position and size section has X, Y, Width and Height fields (`data-pos`), applied on
+`change` and clamped to the page (width and height at least 15). `syncPos()` refreshes them after a drag, a
+resize or a nudge. `nudge(key)` moves the selection (one visual or the group, clamped as a group): with snap
+on, to the next grid line in that direction, so an off-grid visual lands on the grid; with snap off, by 1px.
+
+### Matrix
+The Rows field is `dim`; Add row level appends to `sub`, and each further level's select has Remove this
+level. A field already used as a row level is not offered again, nor as Columns. The + and − in the first
+column are `<button data-act="mxtog">` with a 9px larger invisible hit area: the canvas `pointerdown` ignores
+buttons, so a toggle never selects, drags or opens the visual, and the click handler adds or removes the
+row's path in `open`. Expand all stores every parent path (`mxAllPaths()`, level by level); Collapse all
+empties `open`. Changing the Rows field or a level clears `open`, because the paths no longer mean the same
+rows. Table and matrix change into each other keeping measure, rows field and periods.
+
 ### Pages
 The tab strip lists `cur().pages`; New page adds an empty page named "Page n". The "⋯" on the active tab
 opens the Page dialog: rename, move left or right, duplicate, delete (two taps; the last page can't be
@@ -219,6 +253,20 @@ Template mode edits a client template on the same canvas with layout elements on
 image, button), plus the optional simple header band (title, colours, logo). Apply in a wireframe copies
 the template's settings, including canvas size. The Layers tab can hide the template layout per wireframe
 (`hideLayout`).
+
+A text box's Shows option binds it to the report name or the page name. Choosing Report name on a box whose
+text ends in a separator (`Sales |`) moves the separator into `sep`. Choosing Page name when the page has a
+report-name box turns on Start after the report name (`follow`), and the X field is disabled while it is on.
+A following box's left edge is computed at render:
+
+```
+start = report box's text start (left: x + 6, centre or right from its width and alignment)
+x     = start + width(report text incl. " |") + width(" ") − 6
+```
+
+Widths come from a canvas `measureText()` in the report box's weight and size and the wireframe's font, so
+the gap after the separator is the same space that sits before it. The report name wraps inside its own
+box if it is wider than the box; the measured width is capped at the box.
 
 ### Layers, bookmarks, notes and data
 - Layers: front-to-back order, show or hide, select, move forward or backward, show hidden visuals faintly.
@@ -395,6 +443,15 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
   Sketch off. Tips: nine rows, visible at the bottom of the rail. Stability:
   each tool shows its default, the eraser has none, the same zigzag at 90 is much shorter than at 0 and
   still ends at the lift point, and the value survives a reload.
+- Keyboard: Delete and Backspace delete one or a multi-selection, Undo restores them; Backspace in a field
+  does not; arrows move one grid step with snap and 1px without, and the X field follows; typed X and an
+  oversized width are clamped to the page.
+- Matrix: added from the library with its first group expanded; + and − toggle without selecting; Expand
+  all and Collapse all; a third level; Columns by quarter and by year with Periods shown; Table changed to
+  Matrix keeps its measure and rows; a ratio's total is a rate.
+- Bound text: in the template and in a wireframe, the gap before and after the `|` measured with DOM
+  Ranges is equal (to 0.3px), and stays equal after renaming the wireframe; renaming a page and adding a
+  page change the page name; a backup and template exported by the previous release import and open.
 - Light and dark logo; CSV export downloads.
 - Side panel hides and shows on wide screens; the panel never scrolls sideways (`scrollWidth` equals
   `clientWidth` on every tab and edit sheet, in WebKit).
@@ -417,6 +474,8 @@ scrolling, Add to Home Screen and offline launch.
   back button style.
 - **Top bar flex.** `.bar > *` is `flex: none` and the name field has a fixed flex basis, so inputs can't
   overlap the buttons.
+- **A following page-name box's position is not rounded.** Rounding it to whole pixels left the two gaps
+  either side of the `|` up to half a pixel apart, which shows at Fit zoom on a large title.
 - **Stacking.** Each `.vis` is its own stacking context (3D flip). A handle of a selected visual can sit
   under a neighbour that overlaps it.
 - **Second measure axis.** Last year and budget share the primary axis; only other measures use the right
@@ -436,6 +495,8 @@ scrolling, Add to Home Screen and offline launch.
 - A Pencil resting palm is only guarded against once the Pencil touches: a palm that lands first can start a
   finger drag, which the Pencil's touch then cancels.
 - Text boxes have one size, weight, colour and alignment, and no italics.
+- A matrix does not cross-highlight other visuals from its rows, has no conditional formatting, shows one
+  measure, and clips rather than scrolls when its rows or columns do not fit.
 - Fact.csv export stops above 300,000 rows.
 - Plain http on a LAN address has no service worker, install or share sheet; those need the live https
   site.
