@@ -96,11 +96,12 @@ showHeader, logo (data URL), pageW, pageH` (default 1280 × 720).
 
 Visual (`vDefaults()`): `id, type, x, y, w, h, title, titleAuto, dim, periods, sort, mid, m2, legend, mode,
 ref, drill, sStyle, slider, from, to, params, cf, label, icon, action, bmId, paramId, text, fontSize, bold,
-align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, sub, cols, open`.
+align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, upper, wide, sub, cols, open`.
 
 - `type`: card, column, bar, line, area, donut, table, matrix, slicer, button, shape, text, image.
 - Text boxes: `bind` is `''` (its own `text`), `'report'` (the wireframe's name, then `sep`) or `'page'` (the
-  page's name); `follow: true` places a page-name box after the report-name box (§8).
+  page's name); `follow: true` places a page-name box after the report-name box (§8). `upper` and `wide`
+  change how the text is drawn (`textStyle()`), never the stored `text`.
 - Matrix: `dim` is the first row level and `sub` the further levels (up to three in all), `cols` the column
   field (`''`, a dimension id or a time key), `open` the expanded rows as paths of member keys
   (`'2'`, `'2/5'`).
@@ -264,6 +265,9 @@ start = report box's text start (left: x + 6, centre or right from its width and
 x     = start + width(report text incl. " |") + width(" ") − 6
 ```
 
+`" "` is an em space (U+2003) when the report box has Wide spacing. `textStyle()` turns the text upper case
+(`upper`) and, for `wide`, puts a space between the letters of each word and an em space between words; the
+separator is its own word, so it gets an em space either side. The width is measured on the styled text.
 Widths come from a canvas `measureText()` in the report box's weight and size and the wireframe's font, so
 the gap after the separator is the same space that sits before it. The report name wraps inside its own
 box if it is wider than the box; the measured width is capped at the box.
@@ -449,8 +453,9 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
 - Matrix: added from the library with its first group expanded; + and − toggle without selecting; Expand
   all and Collapse all; a third level; Columns by quarter and by year with Periods shown; Table changed to
   Matrix keeps its measure and rows; a ratio's total is a rate.
-- Bound text: in the template and in a wireframe, the gap before and after the `|` measured with DOM
-  Ranges is equal (to 0.3px), and stays equal after renaming the wireframe; renaming a page and adding a
+- Bound text: in the template and in a wireframe, in Chromium and WebKit, the gap before and after the `|`
+  is equal (to 0.3px) with Wide spacing off and on (an em space when on), with and without Upper case, and
+  stays equal after renaming the wireframe; the stored text is unchanged by either switch; renaming a page and adding a
   page change the page name; a backup and template exported by the previous release import and open.
 - Light and dark logo; CSV export downloads.
 - Side panel hides and shows on wide screens; the panel never scrolls sideways (`scrollWidth` equals
@@ -474,6 +479,9 @@ scrolling, Add to Home Screen and offline launch.
   back button style.
 - **Top bar flex.** `.bar > *` is `flex: none` and the name field has a fixed flex basis, so inputs can't
   overlap the buttons.
+- **WebKit snaps text Range rectangles to whole pixels.** Measuring the gaps around the `|` with
+  `Range.getBoundingClientRect()` reads 3px against 4.4px in WebKit while the layout is exact; measure with
+  span widths, which match the canvas `measureText()` in both engines.
 - **A following page-name box's position is not rounded.** Rounding it to whole pixels left the two gaps
   either side of the `|` up to half a pixel apart, which shows at Fit zoom on a large title.
 - **Stacking.** Each `.vis` is its own stacking context (3D flip). A handle of a selected visual can sit

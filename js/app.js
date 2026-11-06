@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -126,7 +126,7 @@ function vDefaults(type, md) {
     type, title: '', titleAuto: true, dim, periods: D.isTime(dim) ? D.TIME_PERIODS[dim] : 12, sort: 'value', mid: md?.measures[0]?.id || '', m2: '', legend: '', mode: 'clustered',
     ref: 'none', drill: true, sStyle: 'list', slider: true, from: 12, to: 23, params: md ? md.measures.slice(0, 3).map(m => m.id) : [], cf: 'none',
     label: 'Button', icon: 'none', action: 'none', bmId: '', paramId: '', text: 'Text', fontSize: 16, bold: false, align: 'left', textColor: '#252423',
-    src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', sep: '', follow: false,
+    src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', sep: '', follow: false, upper: false, wide: false,
     sub: type === 'matrix' && cat.length > 1 ? [pick(0)] : [], cols: '', open: type === 'matrix' ? ['0'] : []
   };
 }
@@ -490,7 +490,7 @@ function frontHTML(v, S) {
   } else switch (t) {
     case 'slicer': body = htmlSlicer(v); break;
     case 'button': body = `<div class="vbtn">${v.icon !== 'none' && P[v.icon] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${P[v.icon]}</svg>` : ''}${v.label ? `<span>${esc(v.label)}</span>` : ''}</div>`; break;
-    case 'text': body = `<div class="vtext" style="font-size:${v.fontSize}px;font-weight:${v.bold ? 700 : 400};color:${v.textColor};justify-content:${{ left: 'flex-start', center: 'center', right: 'flex-end' }[v.align] || 'flex-start'};text-align:${v.align}">${esc(v.text)}</div>`; break;
+    case 'text': body = `<div class="vtext" style="font-size:${v.fontSize}px;font-weight:${v.bold ? 700 : 400};color:${v.textColor};justify-content:${{ left: 'flex-start', center: 'center', right: 'flex-end' }[v.align] || 'flex-start'};text-align:${v.align}">${esc(textStyle(v.text, v))}</div>`; break;
     case 'image': body = v.src ? `<img class="vimg" src="${v.src}" alt="" style="object-fit:${v.fit}">` : '<div class="imgph">Image</div>'; break;
   }
   return `<div class="face front ${np ? 'nopad' : ''}" style="${faceStyle(S, bg)}">${showT ? `<div class="vt" style="font-size:${S.titleSize}pt">${esc(title)}</div>` : ''}<div class="vb">${body}</div>${(v.notes || '').trim() && cur()?.notesMode !== 'side' ? '<span class="hasnote" aria-hidden="true"></span>' : ''}</div>`;
@@ -599,6 +599,14 @@ function textW(str, v, font) {
   measureCtx.font = `${v.bold ? 700 : 400} ${v.fontSize}px ${font}`; return measureCtx.measureText(str).width;
 }
 const TXT_PAD = 6; // .vtext's side padding
+const EM_SPACE = '\u2003';
+// Upper case, and wide spacing: a space between the letters of a word and an em space between words (a separator
+// such as "|" counts as a word). Applied when drawing, so the stored text keeps its case and spacing.
+function textStyle(str, v) {
+  let t = v.upper ? String(str).toUpperCase() : String(str);
+  if (v.wide) t = t.split('\n').map(l => l.trim().split(/\s+/).map(w => [...w].join(' ')).join(EM_SPACE)).join('\n');
+  return t;
+}
 function bindText(list, o, p) {
   if (!list.some(v => v.type === 'text' && v.bind)) return list;
   const wf = !!o.pages, font = o.settings.font, rep = list.find(v => v.type === 'text' && v.bind === 'report' && !v.hidden);
@@ -607,8 +615,8 @@ function bindText(list, o, p) {
     if (v.type !== 'text' || !v.bind) return v;
     const r = { ...v, text: txt(v) };
     if (v.bind === 'page' && v.follow && rep) {
-      const w = Math.min(textW(txt(rep), rep, font), rep.w - TXT_PAD * 2), start = rep.align === 'right' ? rep.x + rep.w - TXT_PAD - w : rep.align === 'center' ? rep.x + (rep.w - w) / 2 : rep.x + TXT_PAD;
-      r.x = start + w + textW(' ', rep, font) - TXT_PAD;
+      const w = Math.min(textW(textStyle(txt(rep), rep), rep, font), rep.w - TXT_PAD * 2), start = rep.align === 'right' ? rep.x + rep.w - TXT_PAD - w : rep.align === 'center' ? rep.x + (rep.w - w) / 2 : rep.x + TXT_PAD;
+      r.x = start + w + textW(rep.wide ? EM_SPACE : ' ', rep, font) - TXT_PAD;
     }
     return r;
   });
@@ -751,7 +759,7 @@ function sheetBody(v) {
   const n = customCount(v);
   let h = '<section>';
   if (t === 'button') h += `<h3>Button</h3>${F.text('v', 'label', 'Button text', v.label)}${F.sel('v', 'icon', 'Icon', [['none', 'None'], ['filter', 'Filter'], ['close', 'Close'], ['arrow', 'Arrow'], ['info', 'Info'], ['home', 'Home'], ['chart', 'Chart'], ['settings', 'Settings']], v.icon)}${ui.mode === 'tpl' ? '<p class="hint">Layout buttons are for show. Link bookmarks to buttons in a wireframe.</p>' : F.sel('v', 'target', 'On click', [['', 'Do nothing'], ...pg().bookmarks.map(b => [b.id, 'Bookmark: ' + b.name])], v.action === 'bookmark' ? v.bmId : '') + (pg().bookmarks.length ? '' : '<p class="hint">Add bookmarks in the Bookmarks tab, then choose one here.</p>')}`;
-  else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : 'Shows the name of the page.'}${v.bind === 'page' && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
+  else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${F.sw('v', 'upper', 'Upper case', v.upper)}${F.sw('v', 'wide', 'Wide spacing', v.wide)}${v.wide ? '<p class="hint">A space between letters and an em space between words and around the separator.</p>' : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : 'Shows the name of the page.'}${v.bind === 'page' && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
   else if (t === 'image') h += `<h3>Image</h3><div class="field"><span>Image file</span><div class="inline"><label class="filebtn">Upload<input type="file" accept="image/*" data-vimg></label>${v.src ? '<button data-act="imgclear">Remove</button>' : ''}</div></div>${F.sel('v', 'fit', 'Fit', [['contain', 'Fit inside'], ['cover', 'Fill and crop']], v.fit)}<p class="hint">Use this for client logos in page layouts.</p>`;
   else {
     h += `<h3>Fields</h3><label class="field stack"><span>Title${v.titleAuto ? '' : cus}</span><input type="text" data-v="title" value="${esc(v.titleAuto ? '' : v.title)}" placeholder="${esc(autoTitle(v) || 'No title')}"></label>`;
