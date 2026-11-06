@@ -96,12 +96,17 @@ showHeader, logo (data URL), pageW, pageH` (default 1280 × 720).
 
 Visual (`vDefaults()`): `id, type, x, y, w, h, title, titleAuto, dim, periods, sort, mid, m2, legend, mode,
 ref, drill, sStyle, slider, from, to, params, cf, label, icon, action, bmId, paramId, text, fontSize, bold,
-align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, upper, wide, sub, cols, open`.
+align, textColor, src, fit, notes, ov, hidden, bind, sep, follow, upper, wide, navDir, navN, navGap, navSize, navBold, navText, navHi, navSel,
+sub, cols, open`.
 
-- `type`: card, column, bar, line, area, donut, table, matrix, slicer, button, shape, text, image.
+- `type`: card, column, bar, line, area, donut, table, matrix, slicer, button, pagenav, shape, text, image.
 - Text boxes: `bind` is `''` (its own `text`), `'report'` (the wireframe's name, then `sep`) or `'page'` (the
   page's name); `follow: true` places a page-name box after the report-name box (§8). `upper` and `wide`
   change how the text is drawn (`textStyle()`), never the stored `text`.
+- Page navigator (`pagenav`): one button per page. `navDir` `'vertical'` or `'horizontal'`, `navN` the number of
+  placeholders shown in a template, `navGap`, `navSize`, `navBold`, `navText` (text colour); `navHi` highlights
+  the current page in `navSel` (`''` is the palette's second colour). The fill is the visual's custom fill or
+  the palette's first colour.
 - Matrix: `dim` is the first row level and `sub` the further levels (up to three in all), `cols` the column
   field (`''`, a dimension id or a time key), `open` the expanded rows as paths of member keys
   (`'2'`, `'2/5'`).
@@ -156,8 +161,10 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   `periodKey()` picks the time field whose Periods shown sets the range (the column field, else a row
   level); `timeRange()` is shared with the other visuals. Slicers filter it; cross-highlights from other
   visuals filter it; it does not highlight others.
-- `bindText(list, o, p)` resolves bound text boxes before rendering, in `renderPage()` (template layout and
-  the page's own visuals) and in `thumb()`. It returns copies: the stored `text` and `x` are never changed.
+- `bindText(list, o, p)` resolves bound text boxes and page navigators before rendering, in `renderPage()` (template layout and
+  the page's own visuals) and in `thumb()`. It returns copies: the stored `text` and `x` are never changed. In a wireframe a page navigator's copy
+  gets `_pages` (the page names in tab order) and `_cur` (the active page's index); `htmlNav()` draws them,
+  or Page 1 to Page `navN` in a template.
 - Cross-highlight (`ui.hl = { src, dim, i }`): visuals on the same dimension fade the other members;
   column and bar visuals on other dimensions draw a highlighted portion; line, area, card, table and
   donut are filtered.
@@ -256,8 +263,9 @@ the template's settings, including canvas size. The Layers tab can hide the temp
 (`hideLayout`).
 
 A text box's Shows option binds it to the report name or the page name. Choosing Report name on a box whose
-text ends in a separator (`Sales |`) moves the separator into `sep`. Choosing Page name when the page has a
-report-name box turns on Start after the report name (`follow`), and the X field is disabled while it is on.
+text ends in a separator (`Sales |`) moves the separator into `sep`. Choosing Page name on a box that shares a row with
+the report-name box (their vertical extents overlap) turns on Start after the report name (`follow`); a box
+elsewhere keeps its position, and the X field is disabled while it is on.
 A following box's left edge is computed at render:
 
 ```

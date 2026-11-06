@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.3.1.**
+made to be added to an iPad Home Screen. **Status: 1.3.2.**
 
 ## Stack
 
@@ -27,7 +27,10 @@ offline once loaded.
 - **Report and page names:** a text box can show its own text, the **report name** (the wireframe's name,
   followed by a separator such as `|`) or the **page name**. A page-name box set to start after the report
   name sits one space after the separator, so the spacing either side of the `|` stays even as the name
-  changes. In the template both show their sample text. Any text box can be set to **Upper case** and to
+  changes. In the template both show their sample text.
+- **Page navigator:** one visual with a button per page, vertical or horizontal. In a template it shows
+  placeholders (Page 1, Page 2…); in a wireframe it lists the wireframe's pages in the order of the page tabs,
+  follows renames, new pages and reordering, and highlights the current page. Any text box can be set to **Upper case** and to
   **Wide spacing** (a space between the letters of each word and an em space between words and either side of
   the separator); the stored text keeps its own case and spacing.
 - **Canvas:** presets from 16:9 to Letter and Tooltip, or a custom size; Fit, 100, 75 and 50% zoom; a grid
@@ -36,7 +39,7 @@ offline once loaded.
 - **Keyboard:** Delete (or Backspace) deletes the selected visuals, with Undo in the message that follows.
   The arrow keys nudge the selection: one grid step with snap on, 1px with it off.
 - **Visuals:** card, column, bar, line, area, donut, table, matrix, slicer (list, dropdown, tiles, date range, field
-  parameter), button, shape, text box and image. With a visual selected, tapping another type in the
+  parameter), button, page navigator, shape, text box and image. With a visual selected, tapping another type in the
   library changes it after a confirmation. The library collapses to icons, and on wide screens (iPad
   landscape, desktop) the side panel button in the top bar hides the right panel to give the canvas more room.
 - **Matrix:** up to three row levels (dimensions, or Year, Quarter and Month) with + and − to expand and

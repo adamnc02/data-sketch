@@ -363,3 +363,7 @@ dialog::backdrop{background:rgba(20,24,28,.45)}
 /* Wide: the visuals list scrolls on its own so the tips stay visible at the bottom of the rail */
 @media (min-width:901px){.lib{overflow:hidden}.libitems{flex:1;min-height:0;overflow:auto}}
 @media (max-width:900px){.gestures{display:none}.lib{flex-direction:row}.libitems{display:contents}}
+.vnav{position:absolute;inset:0;display:flex;flex-direction:column}
+.vnav.row{flex-direction:row}
+.vnb{flex:1 1 0;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 8px;overflow:hidden}
+.vnb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

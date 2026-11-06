@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -38,6 +38,7 @@ const I = {
   matrix: ic('<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M10 4v16M13 13h5M13 16.5h5M5.5 12.5h2M6.5 11.5v2"/>'),
   slicer: ic('<rect x="4" y="5" width="4" height="4"/><rect x="4" y="15" width="4" height="4"/><path d="M11 7h9M11 17h9"/>'),
   button: ic('<rect x="3" y="7" width="18" height="10" rx="5"/><path d="M9 12h6"/>'),
+  pagenav: ic('<rect x="4" y="3.5" width="16" height="4.5" rx="1.5"/><rect x="4" y="9.75" width="16" height="4.5" rx="1.5"/><rect x="4" y="16" width="16" height="4.5" rx="1.5"/>'),
   shape: ic('<rect x="4" y="4" width="16" height="16" rx="2"/>'), text: ic('<path d="M5 6h14M12 6v13"/>'),
   image: ic('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 7"/>'),
   pencil: ic('<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>'),
@@ -52,11 +53,12 @@ const TYPES = {
   card: { name: 'Card', w: 300, h: 105 }, column: { name: 'Column chart', w: 405, h: 255 }, bar: { name: 'Bar chart', w: 405, h: 255 },
   line: { name: 'Line chart', w: 600, h: 255 }, area: { name: 'Area chart', w: 600, h: 255 }, donut: { name: 'Donut chart', w: 300, h: 255 },
   table: { name: 'Table', w: 450, h: 255 }, matrix: { name: 'Matrix', w: 510, h: 300 }, slicer: { name: 'Slicer', w: 210, h: 255 }, button: { name: 'Button', w: 135, h: 45 },
+  pagenav: { name: 'Page navigator', w: 180, h: 150 },
   shape: { name: 'Shape', w: 300, h: 300 }, text: { name: 'Text box', w: 300, h: 45 }, image: { name: 'Image', w: 150, h: 60 }
 };
 const MULTI = ['column', 'bar', 'line', 'area'];
 const DATA_TYPES = ['card', 'column', 'bar', 'line', 'area', 'donut', 'table', 'matrix'];
-const LAYOUT_TYPES = ['shape', 'text', 'image', 'button'];
+const LAYOUT_TYPES = ['shape', 'text', 'image', 'button', 'pagenav'];
 const SLICER_SIZES = { list: [210, 255], dropdown: [210, 75], tiles: [405, 75], date: [300, 120], param: [405, 75] };
 const HIER = ['T:Year', 'T:Quarter', 'T:Month'];
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -127,6 +129,7 @@ function vDefaults(type, md) {
     ref: 'none', drill: true, sStyle: 'list', slider: true, from: 12, to: 23, params: md ? md.measures.slice(0, 3).map(m => m.id) : [], cf: 'none',
     label: 'Button', icon: 'none', action: 'none', bmId: '', paramId: '', text: 'Text', fontSize: 16, bold: false, align: 'left', textColor: '#252423',
     src: null, fit: 'contain', notes: '', ov: {}, hidden: false, bind: '', sep: '', follow: false, upper: false, wide: false,
+    navDir: 'vertical', navN: 3, navGap: 6, navSize: 13, navBold: true, navText: '#ffffff', navHi: true, navSel: '',
     sub: type === 'matrix' && cat.length > 1 ? [pick(0)] : [], cols: '', open: type === 'matrix' ? ['0'] : []
   };
 }
@@ -141,7 +144,7 @@ function autoTitle(v) {
   switch (v.type) {
     case 'card': return m;
     case 'slicer': return v.sStyle === 'param' ? 'Measure' : v.sStyle === 'date' ? 'Date' : dn;
-    case 'button': case 'shape': case 'text': case 'image': return '';
+    case 'button': case 'pagenav': case 'shape': case 'text': case 'image': return '';
     case 'matrix': return `${m} by ${mxLevels(v).map(dimKeyName).join(' and ') || 'item'}${mxCols(v) ? ` and ${dimKeyName(v.cols)}` : ''}`;
   }
   let m2 = '';
@@ -472,7 +475,7 @@ function htmlCard(v, S, W, H, d) {
   return `<div class="vcard"><div class="vcv" style="font-size:${fs}px;color:${S.color || '#252423'}">${d.fmt(val)}</div><div class="vcl">${esc(tTitle(v))}</div>${H > 80 && ch ? `<div class="vcd">${ch}</div>` : ''}</div>`;
 }
 function frontHTML(v, S) {
-  const t = v.type, title = tTitle(v), showT = !['card', 'button', 'text', 'image'].includes(t) && !!title, np = ['button', 'text', 'image'].includes(t) || (t === 'shape' && !showT), pad = np ? 0 : 10;
+  const t = v.type, title = tTitle(v), showT = !['card', 'button', 'pagenav', 'text', 'image'].includes(t) && !!title, np = ['button', 'pagenav', 'text', 'image'].includes(t) || (t === 'shape' && !showT), pad = np ? 0 : 10;
   const th = showT ? Math.round(S.titleSize * 1.333 * 1.35) + 6 : 0, W = Math.max(20, v.w - pad * 2 - 2), H = Math.max(20, v.h - pad * 2 - 2 - th);
   const bg = t === 'button' ? (S.color || S.palette[0]) : t === 'shape' ? (S.color || S.visualBg) : (t === 'text' || t === 'image') ? (S.color || 'transparent') : S.visualBg;
   let body = '';
@@ -491,9 +494,19 @@ function frontHTML(v, S) {
     case 'slicer': body = htmlSlicer(v); break;
     case 'button': body = `<div class="vbtn">${v.icon !== 'none' && P[v.icon] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${P[v.icon]}</svg>` : ''}${v.label ? `<span>${esc(v.label)}</span>` : ''}</div>`; break;
     case 'text': body = `<div class="vtext" style="font-size:${v.fontSize}px;font-weight:${v.bold ? 700 : 400};color:${v.textColor};justify-content:${{ left: 'flex-start', center: 'center', right: 'flex-end' }[v.align] || 'flex-start'};text-align:${v.align}">${esc(textStyle(v.text, v))}</div>`; break;
+    case 'pagenav': body = htmlNav(v, S); break;
     case 'image': body = v.src ? `<img class="vimg" src="${v.src}" alt="" style="object-fit:${v.fit}">` : '<div class="imgph">Image</div>'; break;
   }
-  return `<div class="face front ${np ? 'nopad' : ''}" style="${faceStyle(S, bg)}">${showT ? `<div class="vt" style="font-size:${S.titleSize}pt">${esc(title)}</div>` : ''}<div class="vb">${body}</div>${(v.notes || '').trim() && cur()?.notesMode !== 'side' ? '<span class="hasnote" aria-hidden="true"></span>' : ''}</div>`;
+  return `<div class="face front ${np ? 'nopad' : ''}" style="${t === 'pagenav' ? 'background:transparent;border:0;box-shadow:none' : faceStyle(S, bg)}">${showT ? `<div class="vt" style="font-size:${S.titleSize}pt">${esc(title)}</div>` : ''}<div class="vb">${body}</div>${(v.notes || '').trim() && cur()?.notesMode !== 'side' ? '<span class="hasnote" aria-hidden="true"></span>' : ''}</div>`;
+}
+/* Page navigator: one button per page, in page-tab order. bindText() gives a wireframe's copy its page names
+   (_pages) and the active page's index (_cur); a template shows navN placeholders, Page 1 to Page N. */
+function htmlNav(v, S) {
+  const names = v._pages || Array.from({ length: v.navN }, (_, i) => `Page ${i + 1}`), at = v._pages ? v._cur : 0, fill = S.color || S.palette[0];
+  return `<div class="vnav ${v.navDir === 'horizontal' ? 'row' : ''}" style="gap:${v.navGap}px">${names.map((n, i) => {
+    const on = v.navHi && i === at;
+    return `<div class="vnb ${on ? 'on' : ''}" style="${faceStyle(S, on ? v.navSel || S.palette[1] || fill : fill)};color:${v.navText};font-size:${v.navSize}px;font-weight:${v.navBold || on ? 700 : 400}"><span>${esc(n)}</span></div>`;
+  }).join('')}</div>`;
 }
 function layoutHTML(v, S0) { if (v.hidden) return ''; return `<div class="vis locked" style="left:${v.x}px;top:${v.y}px;width:${v.w}px;height:${v.h}px"><div class="flip">${frontHTML({ ...v, notes: '' }, eff(v, S0))}</div></div>`; }
 function visHTML(v, pin) {
@@ -521,6 +534,8 @@ function tipHTML(v, i) {
 /* ---------- home ---------- */
 function thumbRects(list, S) {
   return list.filter(v => !v.hidden).map(v => {
+    if (v.type === 'pagenav') { const n = v._pages ? v._pages.length : v.navN, row = v.navDir === 'horizontal', g = v.navGap, bw = row ? (v.w - g * (n - 1)) / n : v.w, bh = row ? v.h : (v.h - g * (n - 1)) / n;
+      return Array.from({ length: n }, (_, i) => `<rect x="${row ? v.x + i * (bw + g) : v.x}" y="${row ? v.y : v.y + i * (bh + g)}" width="${Math.max(1, bw)}" height="${Math.max(1, bh)}" rx="${v.ov && v.ov.radius !== undefined ? v.ov.radius : S.radius}" fill="${v.ov && v.ov.color || S.palette[0]}"/>`).join(''); }
     const f = v.ov && v.ov.color || (v.type === 'button' ? S.palette[0] : v.type === 'text' ? 'none' : v.type === 'image' ? 'rgba(0,0,0,.06)' : S.visualBg);
     return `<rect x="${v.x}" y="${v.y}" width="${v.w}" height="${v.h}" rx="${v.ov && v.ov.radius !== undefined ? v.ov.radius : S.radius}" fill="${f}" ${v.type === 'text' ? '' : 'stroke="rgba(0,0,0,.12)" stroke-width="2"'}/>${v.type === 'text' ? `<rect x="${v.x + 4}" y="${v.y + v.h / 2 - 4}" width="${Math.max(0, Math.min(v.w - 8, (v.text || '').length * v.fontSize * .5))}" height="8" rx="4" fill="${v.textColor}" opacity=".5"/>` : ''}`;
   }).join('');
@@ -608,10 +623,11 @@ function textStyle(str, v) {
   return t;
 }
 function bindText(list, o, p) {
-  if (!list.some(v => v.type === 'text' && v.bind)) return list;
+  if (!list.some(v => v.type === 'pagenav' || v.type === 'text' && v.bind)) return list;
   const wf = !!o.pages, font = o.settings.font, rep = list.find(v => v.type === 'text' && v.bind === 'report' && !v.hidden);
   const txt = v => v.bind === 'report' ? (wf ? o.name : v.text) + (v.sep ? ' ' + v.sep : '') : v.bind === 'page' ? (wf && p ? p.name : v.text) : v.text;
   return list.map(v => {
+    if (v.type === 'pagenav') return wf ? { ...v, _pages: o.pages.map(x => x.name), _cur: Math.max(0, o.pages.indexOf(p)) } : v;
     if (v.type !== 'text' || !v.bind) return v;
     const r = { ...v, text: txt(v) };
     if (v.bind === 'page' && v.follow && rep) {
@@ -621,7 +637,7 @@ function bindText(list, o, p) {
     return r;
   });
 }
-const hasBound = list => !!list?.some(v => v.type === 'text' && v.bind);
+const hasBound = list => !!list?.some(v => v.type === 'pagenav' || v.type === 'text' && v.bind);
 function renderPage() {
   const o = cur(), p = pg(), s = o.settings, g = o.grid, side = o.notesMode === 'side', pins = {};
   if (side) notesOrder().forEach((v, i) => pins[v.id] = i + 1);
@@ -759,6 +775,7 @@ function sheetBody(v) {
   const n = customCount(v);
   let h = '<section>';
   if (t === 'button') h += `<h3>Button</h3>${F.text('v', 'label', 'Button text', v.label)}${F.sel('v', 'icon', 'Icon', [['none', 'None'], ['filter', 'Filter'], ['close', 'Close'], ['arrow', 'Arrow'], ['info', 'Info'], ['home', 'Home'], ['chart', 'Chart'], ['settings', 'Settings']], v.icon)}${ui.mode === 'tpl' ? '<p class="hint">Layout buttons are for show. Link bookmarks to buttons in a wireframe.</p>' : F.sel('v', 'target', 'On click', [['', 'Do nothing'], ...pg().bookmarks.map(b => [b.id, 'Bookmark: ' + b.name])], v.action === 'bookmark' ? v.bmId : '') + (pg().bookmarks.length ? '' : '<p class="hint">Add bookmarks in the Bookmarks tab, then choose one here.</p>')}`;
+  else if (t === 'pagenav') h += `<h3>Page navigator</h3><p class="hint">One button per page, in the order of the page tabs${ui.mode === 'tpl' ? '. In the template it shows placeholders; each wireframe shows its own pages' : ''}.</p>${ui.mode === 'tpl' ? F.num('v', 'navN', 'Placeholder pages', v.navN, 1, 20) : ''}${F.sel('v', 'navDir', 'Direction', [['vertical', 'Vertical'], ['horizontal', 'Horizontal']], v.navDir)}${F.num('v', 'navGap', 'Gap (px)', v.navGap, 0, 60)}${F.num('v', 'navSize', 'Text size (px)', v.navSize, 8, 40)}${F.sw('v', 'navBold', 'Bold', v.navBold)}${F.color('v', 'navText', 'Text colour', v.navText)}${F.sw('v', 'navHi', 'Highlight the current page', v.navHi)}${v.navHi ? F.color('v', 'navSel', 'Current page fill', v.navSel || s.palette[1] || s.palette[0]) : ''}`;
   else if (t === 'text') h += `<h3>Text</h3>${F.sel('v', 'bind', 'Shows', [['', 'Its own text'], ['report', 'Report name'], ['page', 'Page name']], v.bind)}${!v.bind ? F.text('v', 'text', 'Text', v.text) : ui.mode === 'tpl' ? F.text('v', 'text', 'Sample text', v.text) : ''}${v.bind === 'report' ? F.text('v', 'sep', 'Separator after the name', v.sep, 'None') : ''}${v.bind === 'page' ? F.sw('v', 'follow', 'Start after the report name', v.follow) : ''}${F.sw('v', 'upper', 'Upper case', v.upper)}${F.sw('v', 'wide', 'Wide spacing', v.wide)}${v.wide ? '<p class="hint">A space between letters and an em space between words and around the separator.</p>' : ''}${v.bind ? `<p class="hint">${v.bind === 'report' ? 'Shows the wireframe’s name, then the separator.' : 'Shows the name of the page.'}${v.bind === 'page' && v.follow ? ' Sits one space after the report name’s separator and moves with the name’s length.' : ''}${ui.mode === 'tpl' ? ' The sample text shows here in the template.' : ''}</p>` : ''}${F.num('v', 'fontSize', 'Size (px)', v.fontSize, 8, 72)}${F.sw('v', 'bold', 'Bold', v.bold)}${F.sel('v', 'align', 'Align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], v.align)}${F.color('v', 'textColor', 'Text colour', v.textColor)}`;
   else if (t === 'image') h += `<h3>Image</h3><div class="field"><span>Image file</span><div class="inline"><label class="filebtn">Upload<input type="file" accept="image/*" data-vimg></label>${v.src ? '<button data-act="imgclear">Remove</button>' : ''}</div></div>${F.sel('v', 'fit', 'Fit', [['contain', 'Fit inside'], ['cover', 'Fill and crop']], v.fit)}<p class="hint">Use this for client logos in page layouts.</p>`;
   else {
@@ -801,7 +818,7 @@ function sheetBody(v) {
   if (multi || t === 'table' || t === 'matrix') h += tri('gridlines', 'Gridlines');
   if (multi || t === 'donut') h += tri('tooltips', 'Tooltips');
   h += tri('border', 'Border') + tri('shadow', 'Shadow') + `<label class="field"><span>Corner radius${o.radius !== undefined ? cus : ''}</span><input type="number" min="0" max="40" data-ovr value="${o.radius ?? ''}" placeholder="${s.radius}" style="width:80px"></label>`;
-  if (['column', 'bar', 'line', 'area', 'card', 'button', 'shape', 'text', 'image'].includes(t)) h += `<div class="field"><label class="sw" style="margin:0"><input type="checkbox" role="switch" data-ovcon ${o.color ? 'checked' : ''}><span class="track"></span><span>${['button', 'shape'].includes(t) ? 'Custom fill' : ['text', 'image'].includes(t) ? 'Background' : 'Custom colour'}</span></label><input type="color" data-ovc value="${o.color || (['shape', 'text', 'image'].includes(t) ? s.visualBg : s.palette[0])}" ${o.color ? '' : 'disabled'} aria-label="Colour"></div>`;
+  if (['column', 'bar', 'line', 'area', 'card', 'button', 'pagenav', 'shape', 'text', 'image'].includes(t)) h += `<div class="field"><label class="sw" style="margin:0"><input type="checkbox" role="switch" data-ovcon ${o.color ? 'checked' : ''}><span class="track"></span><span>${['button', 'pagenav', 'shape'].includes(t) ? 'Custom fill' : ['text', 'image'].includes(t) ? 'Background' : 'Custom colour'}</span></label><input type="color" data-ovc value="${o.color || (['shape', 'text', 'image'].includes(t) ? s.visualBg : s.palette[0])}" ${o.color ? '' : 'disabled'} aria-label="Colour"></div>`;
   const pos = (k, label) => `<label class="field"><span>${label}</span><input type="number" data-pos="${k}" value="${v[k]}" min="${k === 'w' || k === 'h' ? 15 : 0}" max="4000" style="width:80px" ${k === 'x' && v.bind === 'page' && v.follow ? 'disabled' : ''}></label>`;
   h += `</section><section><h3>Position and size (px)</h3>${pos('x', 'X')}${pos('y', 'Y')}${pos('w', 'Width')}${pos('h', 'Height')}${v.bind === 'page' && v.follow ? '<p class="hint">X follows the report name.</p>' : ''}</section><section><h3>Arrange</h3><div class="acts"><button data-act="zfront">To front</button><button data-act="zfwd">Forward</button><button data-act="zbwd">Backward</button><button data-act="zback">To back</button></div>${F.sw('v', 'hidden', 'Hidden', v.hidden)}</section>
  <section class="acts">${ui.mode === 'tpl' ? '' : '<button data-act="flipnote">Flip to notes</button>'}<button data-act="dup">Duplicate</button><button class="danger" data-act="del">Delete</button></section>
@@ -1446,7 +1463,7 @@ document.addEventListener('click', e => {
     case 'gopage': if (id !== pg().id) goPage(id); break;
     case 'addpage': addPage(); break;
     case 'pagemenu': pageDialog(); break;
-    case 'pagemove': { const ps = o.pages, i = ps.indexOf(pg()), j = i + +b.dataset.val; if (j < 0 || j >= ps.length) break; ps.splice(j, 0, ps.splice(i, 1)[0]); renderPages(); pageDialog(); save(); break; }
+    case 'pagemove': { const ps = o.pages, i = ps.indexOf(pg()), j = i + +b.dataset.val; if (j < 0 || j >= ps.length) break; ps.splice(j, 0, ps.splice(i, 1)[0]); renderPages(); if (hasBound(tplOf(o)?.visuals) || hasBound(pg().visuals)) renderPage(); pageDialog(); save(); break; }
     case 'pagedup': closeDlg(); dupPage(); toast('Page duplicated'); break;
     case 'pagedel': arm(b, 'Confirm delete', () => { const ps = o.pages, i = ps.indexOf(pg()); ps.splice(i, 1); closeDlg(); goPage(ps[Math.max(0, i - 1)].id); }); break;
     case 'flipback': flipOne(b.closest('.vis').dataset.id, false); break;
@@ -1578,7 +1595,8 @@ document.addEventListener('input', e => {
       v.bind = t.value;
       // A report-name box keeps a trailing separator from its text ("Sales |") as its separator.
       const m = v.bind === 'report' && !v.sep && (v.text || '').match(/\s*([|•·–—\/-])\s*$/); if (m && m.index) { v.sep = m[1]; v.text = v.text.slice(0, m.index); }
-      if (v.bind === 'page' && pg().visuals.some(x => x.type === 'text' && x.bind === 'report')) v.follow = true;
+      // A page-name box on the report name's row starts after it; one elsewhere keeps its place.
+      if (v.bind === 'page' && pg().visuals.some(x => x.type === 'text' && x.bind === 'report' && x.y < v.y + v.h && v.y < x.y + x.h)) v.follow = true;
     }
     else if (k === 'title') { v.title = t.value; v.titleAuto = t.value.trim() === ''; }
     else if (k === 'target') { v.action = t.value ? 'bookmark' : 'none'; v.bmId = t.value; }
