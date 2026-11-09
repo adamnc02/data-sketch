@@ -69,7 +69,9 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
   `skUndo` / `skRedo`, `drawing`, `ghost` (show hidden visuals faintly), `vdata` (computed visual data for
   tooltips), `exportCache`, `clip` (the clipboard: copied visuals, the wireframe or template and page they came from,
   and a paste count per page), `last` / `lastE` / `lastM` (the previous tap on a visual, on empty canvas and in
-  multi-select, for double-tap), `downT` (time of the last `pointerdown`).
+  multi-select, for double-tap), `downT` (time of the last `pointerdown`), `hist` (undo history: the open
+  document's id, its latest snapshot and the undo and redo stacks).
+- `save()`'s debounced write first calls `histNote()`, which records an undo step when the document changed.
 - `cur()` is the wireframe or template being edited. `pg()` is the active page: the wireframe page whose id
   is `pageId` (else the first), or the template itself. `findV(id)` looks in `pg()`. `model()` is the
   wireframe's data model. `pw()` / `ph()` are the canvas width and height from `cur().settings`.
@@ -198,7 +200,8 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   listener handles zoom, the canvas size controls (`data-cs`) and the position fields (`data-pos`), so a
   half-typed number never moves anything, and file inputs (`data-import`, `data-vimg`, `data-logo`).
 - One `keydown` listener: Escape closes the ring or the visual menu, or clears the selection; with focus outside
-  any field or dialog, Cmd or Ctrl + V calls `pasteClip()`, and with a selection Cmd or Ctrl + C and X call
+  any field or dialog, Cmd or Ctrl + Z calls `histStep(true)` and Shift + Cmd or Ctrl + Z or Ctrl + Y calls
+  `histStep(false)`, Cmd or Ctrl + V calls `pasteClip()`, and with a selection Cmd or Ctrl + C and X call
   `copyKey()` and `cutKey()`, Delete or Backspace calls `deleteKey()` and the arrow keys call `nudge()`; Enter
   or Space on a focused visual opens its edit sheet.
 - One `contextmenu` listener: on the page in Sketch mode it opens the tool ring; otherwise it opens the visual
@@ -272,6 +275,22 @@ not the system clipboard. `cutKey()` copies, then removes with Undo like `delete
   canvas.
 - The pasted visuals go on top, are selected (as a multi-selection when there are several), and the message
   offers Undo, which removes them.
+
+### Undo history
+`openWf()` calls `histReset()`, so each wireframe or template opened starts an empty history. When a save
+settles, `histNote()` compares a snapshot (`histKey()`: the document as JSON without `pageId` and `updated`) with
+the last one and, if it differs, pushes the old one onto the undo stack (at most `HIST_MAX`, 50) and empties
+redo. Because saves are debounced 350 ms, a burst of changes (typing, a run of nudges) is one step, and leaving
+out `pageId` means switching pages is not a step. `histStep()` first calls `histNote()` so a change still inside
+the debounce is its own step, then swaps the document's contents for the snapshot in place (the object stays
+the one in `store`), keeps the active page if it still exists, clears the selection, highlight, sketch undo and
+any menu, re-renders the page, panel, page tabs, arrange bar, sketch toolbar and name field, and saves. The
+history is in memory and is lost on reload. It covers everything stored in the document, sketches included;
+the sketch toolbar's undo and the two-finger tap still use the sketch's own stack.
+
+🚨 **The snapshot leaves `pageId` and `updated` out rather than overwriting them.** Overwriting (`{ ...o,
+pageId: 0 }`) keeps each key where it was in the object, and a restore can change that order (a template has
+no `pageId`), so an unchanged document read as changed and redo was emptied after every undo.
 
 ### Position and keyboard
 The edit sheet's Position and size section has X, Y, Width and Height fields (`data-pos`), applied on
@@ -514,6 +533,11 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
   linked, a card alone keeps the original slicer on its page, and loses it on another page; a bookmark button
   keeps its bookmark on its page and loses it elsewhere; into a wireframe with a different data model every
   measure and field is in that model and the visuals render; a template takes the layout elements only.
+- Undo: Cmd or Ctrl + Z with nothing done says "Nothing to undo"; undo and redo a drag; three quick nudges
+  undo as one step, straight after; undo a delete, a paste and a type change; Cmd + Z in the name field undoes
+  typing only, and undoing a rename updates the field; switching pages is skipped and an added page removed; a
+  sketch stroke undoes and Ctrl + Y redoes; the undone state is what reloads; undo and redo in a template.
+  Chromium and WebKit.
 - Keyboard: Delete and Backspace delete one or a multi-selection, Undo restores them; Backspace in a field
   does not; arrows move one grid step with snap and 1px without, and the X field follows; typed X and an
   oversized width are clamped to the page.

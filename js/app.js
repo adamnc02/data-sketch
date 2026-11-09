@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -103,6 +103,7 @@ function save() {
   const o = cur(); if (o) o.updated = Date.now();
   setSaved('Saving…'); clearTimeout(saveT);
   saveT = setTimeout(async () => {
+    histNote();
     try { await IDB.set('store', clone(store)); setSaved('Saved'); }
     catch (e) { try { localStorage.setItem(KEY, JSON.stringify(store)); setSaved('Saved'); } catch (_) { setSaved('Not saved: storage unavailable'); } }
   }, 350);
@@ -562,7 +563,7 @@ function renderHome() {
 function openWf(id, mode = 'wf') {
   Object.assign(ui, { mode, view: 'editor', wfId: id, sel: null, multi: new Set(), multiMode: false, panel: 'tab', tab: 'settings', hl: null, skUndo: [], skRedo: [], paramSel: {}, slicerSel: {}, dropOpen: null, ghost: false });
   ui.sk.on = false; ui.sk.open = false; closeRing(); ui.vdata.clear();
-  const o = cur(), T_ = mode === 'tpl';
+  const o = cur(), T_ = mode === 'tpl'; histReset();
   ui.flipped = new Set(o.notesMode === 'flip' ? pg().visuals.map(v => v.id) : []);
   try { ui.sk.pinned = localStorage.getItem('datasketch-skpin') === '1'; } catch (e) {}
   try { ui.sk.stab = JSON.parse(localStorage.getItem('datasketch-stability') || '{}') || {}; } catch (e) { ui.sk.stab = {}; }
@@ -942,6 +943,34 @@ function nudge(key) {
 }
 // Keeps the edit sheet's position fields in step after a drag, a nudge or a typed value.
 function syncPos() { const v = ui.panel === 'visual' && ui.sel ? findV(ui.sel) : null; if (v) document.querySelectorAll('[data-pos]').forEach(i => { if (document.activeElement !== i) i.value = v[i.dataset.pos]; }); }
+/* ---------- undo history ---------- */
+// Cmd or Ctrl + Z undoes the last change to the open wireframe or template; Shift + Cmd + Z or Ctrl + Y redoes.
+// A snapshot of the document is taken when a save settles (save() is debounced 350 ms), so a burst of changes
+// (typing a title, a run of nudges) is one step. The active page and the updated time are left out, so switching
+// pages is not a step. Snapshots are JSON strings, at most HIST_MAX each way, and are lost on reload.
+const HIST_MAX = 50;
+const histKey = ({ pageId, updated, ...rest }) => JSON.stringify(rest);   // leaves the fields out, so key order cannot differ
+function histReset() { const o = cur(); ui.hist = { id: o?.id, last: o ? histKey(o) : '', undo: [], redo: [] }; }
+function histNote() {
+  const o = cur(), h = ui.hist; if (!o || !h || h.id !== o.id) return;
+  const k = histKey(o); if (k === h.last) return;
+  h.undo.push(h.last); if (h.undo.length > HIST_MAX) h.undo.shift(); h.redo = []; h.last = k;
+}
+function histStep(back) {
+  histNote();   // a change still inside the save debounce becomes its own step first
+  const o = cur(), h = ui.hist; if (!o || !h || h.id !== o.id) return;
+  const from = back ? h.undo : h.redo, to = back ? h.redo : h.undo;
+  if (!from.length) return toast(back ? 'Nothing to undo' : 'Nothing to redo');
+  to.push(h.last); h.last = from.pop();
+  const pid = o.pageId; Object.keys(o).forEach(k => delete o[k]); Object.assign(o, JSON.parse(h.last), { updated: Date.now() });
+  if (o.pages) o.pageId = o.pages.some(p => p.id === pid) ? pid : o.pages[0].id;
+  closeMenu(); clearQS(); closeRing();
+  Object.assign(ui, { sel: null, hl: null, dropOpen: null, skUndo: [], skRedo: [] }); ui.multi.clear(); ui.vdata.clear();
+  if (ui.panel === 'visual') ui.panel = 'tab';
+  const nm = $('[data-wfname]'); if (nm) nm.value = ui.mode === 'tpl' ? o.client : o.name;
+  renderPage(); renderPanel(); renderPages(); renderArrange(); renderSkTools(); save();
+}
+
 /* ---------- clipboard ---------- */
 // The clipboard is in memory (ui.clip): it lasts until the app reloads and carries visuals between pages, wireframes
 // and templates. Copies get fresh ids. Links inside the copied set (a visual and the field-parameter slicer it reads)
@@ -1749,6 +1778,9 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ring) { closeRing(); return; }
   if (e.key === 'Escape' && vmenu) { closeMenu(); return; }
   const free = ui.view === 'editor' && !$('#dlg').open && !el.closest?.('input,textarea,select'), onCanvas = free && (ui.sel || ui.multi.size);
+  // Undo and redo: a text field keeps its own text undo.
+  const zk = e.key.toLowerCase();
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && free && (zk === 'z' || (zk === 'y' && e.ctrlKey && !e.metaKey))) { e.preventDefault(); histStep(zk === 'z' && !e.shiftKey); return; }
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && free) {
     const k = e.key.toLowerCase();
     if (k === 'c' && onCanvas) { e.preventDefault(); closeMenu(); copyKey(); return; }

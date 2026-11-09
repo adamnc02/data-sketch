@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.4.0.**
+made to be added to an iPad Home Screen. **Status: 1.5.0.**
 
 ## Stack
 
@@ -38,7 +38,9 @@ offline once loaded.
   and height in the edit sheet.
 - **Keyboard:** Delete (or Backspace) deletes the selected visuals, with Undo in the message that follows.
   The arrow keys nudge the selection: one grid step with snap on, 1px with it off. Cmd or Ctrl + C, X and V
-  copy, cut and paste.
+  copy, cut and paste. Cmd or Ctrl + Z undoes the last change to the wireframe or template (moves, edits,
+  deletes, pastes, data, pages, sketches), and Shift + Cmd + Z or Ctrl + Y redoes it, up to 50 steps, until the
+  app is reloaded. Switching pages is not a step; inside a text field the keys undo typing as usual.
 - **Visual menu:** right-click a visual, or double-tap it (double-click with a mouse), for Change type, Notes,
   Copy, Paste and Delete; on a multi-selection, Copy, Paste and Delete. Right-click or double-tap empty canvas
   for Paste, which is greyed out until something has been copied. In Sketch mode a right-click opens the tool
