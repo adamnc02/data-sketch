@@ -1,7 +1,7 @@
 // DataSketch: Power BI report wireframing
 import * as D from './data.js';
 
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.4.0';
 const $ = (s, r = document) => r.querySelector(s);
 const uid = D.uid;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -28,6 +28,10 @@ const I = {
   x: ic(P.close), back: ic('<path d="M15 5l-7 7 7 7"/>'), fwd: ic('<path d="M9 5l7 7-7 7"/>'),
   more: ic('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'), plus: ic('<path d="M12 5v14M5 12h14"/>'),
   up: ic('<path d="M6 15l6-6 6 6"/>'), down: ic('<path d="M6 9l6 6 6-6"/>'),
+  copy: ic('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>'),
+  paste: ic('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/>'),
+  notes: ic('<path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/>'), swap: ic('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'),
+  trash: ic('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
   eye: ic('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeoff: ic('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><path d="M4 4l16 16"/>'),
   card: ic('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 14h6M7 10h3"/>'),
@@ -109,7 +113,7 @@ function setSaved(t) { const el = $('#saved'); if (el) el.textContent = t; }
 const ui = {
   mode: 'wf', view: 'home', wfId: null, sel: null, panel: 'tab', tab: 'settings', panelOpen: false, flipped: new Set(), hl: null, hlBefore: null, last: null,
   zoom: 'fit', scale: 1, libMin: false, panelMin: false, multi: new Set(), multiMode: false, sk: { on: false, tool: 'pencil', color: '#252423', size: { pencil: 3, pen: 2.5, brush: 8, marker: 16, eraser: 20 }, stab: {}, open: false, pinned: false, prev: 'pencil' },
-  skUndo: [], skRedo: [], drawing: false, ghost: false, paramSel: {}, slicerSel: {}, dropOpen: null, bmOpen: null, mOpen: null, vdata: new Map(), exportCache: null
+  skUndo: [], skRedo: [], drawing: false, ghost: false, paramSel: {}, slicerSel: {}, dropOpen: null, bmOpen: null, mOpen: null, vdata: new Map(), exportCache: null, clip: null
 };
 const cur = () => ui.mode === 'tpl' ? store.templates.find(t => t.id === ui.wfId) : store.wireframes.find(w => w.id === ui.wfId);
 // Visuals, bookmarks and sketches belong to a page. A template is edited as a single page.
@@ -586,8 +590,8 @@ function libHTML() {
   return `<aside class="lib ${min ? 'min' : ''}" aria-label="Visuals"><div class="libhead"><h2>${T_ ? 'Layout elements' : 'Visuals'}</h2><button class="icon libtog" data-act="libmin" aria-expanded="${!min}" aria-label="${min ? 'Show labels' : 'Collapse to icons'}">${min ? I.fwd : I.back}</button></div>
  <div class="libitems">${Object.entries(TYPES).filter(([k]) => !T_ || LAYOUT_TYPES.includes(k)).map(([k, t]) => `<button class="libitem" data-type="${k}" data-act="add" title="${t.name}" aria-label="${t.name}">${I[k]}<span class="lbl">${t.name}</span></button>`).join('')}</div>
  ${T_ ? '<p class="hint">Build the client’s page header, nav rail and logo here. Every wireframe using this template shows this layout, locked, behind its visuals.</p>' : `<div class="gestures" aria-label="Tips"><h3>Tips</h3><dl>
-  <dt>Tap a type</dt><dd>Add / change</dd>
-  <dt>Double-click</dt><dd>Notes</dd>
+  <dt>Tap a type</dt><dd>Add</dd>
+  <dt>Double-tap</dt><dd>Menu</dd>
   <dt>Hold Pencil tip</dt><dd>Tool ring</dd>
   <dt>Double-tap tip</dt><dd>Eraser</dd>
   <dt>Draw + hold</dt><dd>Snap shape</dd>
@@ -603,7 +607,7 @@ function renderPages() {
     + `<button class="addpage" data-act="addpage">${I.plus}New page</button>`;
 }
 function notesOrder() { return pg().visuals.filter(v => (v.notes || '').trim()).sort((a, b) => a.y - b.y || a.x - b.x); }
-function railHTML() { const list = notesOrder(); return `<aside class="rail" id="rail" style="min-height:${ph()}px;font-family:${cur().settings.font}"><h3>Notes</h3>${list.length ? `<ol>${list.map((v, i) => `<li><span class="pin">${i + 1}</span><div><b>${esc(vName(v))}</b><p>${esc(v.notes)}</p></div></li>`).join('')}</ol>` : '<p>No notes yet. Double-click a visual to add one.</p>'}</aside>`; }
+function railHTML() { const list = notesOrder(); return `<aside class="rail" id="rail" style="min-height:${ph()}px;font-family:${cur().settings.font}"><h3>Notes</h3>${list.length ? `<ol>${list.map((v, i) => `<li><span class="pin">${i + 1}</span><div><b>${esc(vName(v))}</b><p>${esc(v.notes)}</p></div></li>`).join('')}</ol>` : '<p>No notes yet. Double-tap or right-click a visual and choose Notes to add one.</p>'}</aside>`; }
 function renderRail() { const r = $('#rail'); if (r) r.outerHTML = railHTML(); }
 /* Text boxes can show the wireframe's name (bind 'report', followed by its separator) or the page's name (bind 'page').
    In a template they show their own text as a sample. A page-name box with `follow` starts one space after the
@@ -715,7 +719,7 @@ function settingsBody() {
  <section><h3>Theme colours</h3>${F.pal('data-pal', s.palette)}</section>
  <section><h3>Grid</h3><label class="field"><span>Grid size (px)</span><input type="number" min="5" max="60" data-g="size" value="${g.size}" style="width:80px"></label>${F.sw('g', 'snap', 'Snap to grid', g.snap)}${F.sw('g', 'show', 'Show grid', g.show)}</section>
  ${T_ ? '' : `<section><h3>Sketch</h3>${F.sw('k', 'pencilDraws', 'Apple Pencil draws outside Sketch mode', o.pencilDraws === true)}${F.sw('k', 'fingerDraws', 'Finger draws in Sketch mode', o.fingerDraws === true)}${F.sw('k', 'showSketch', 'Show sketches', o.showSketch !== false)}<p class="hint">Turn on Sketch in the top bar to draw with Apple Pencil; your finger keeps selecting, moving and resizing visuals. With Sketch off, the Pencil works like a finger. Hold the Pencil tip for the tool ring (right-click on desktop); double-tap it to swap with the eraser. Draw and hold to snap a line, rectangle or ellipse. Pinch to zoom and drag with two fingers to pan; in Sketch mode, tap with two fingers to undo and three to redo.</p></section>
- <section><h3>Notes</h3>${segH('notesmode', o.notesMode, [['hidden', 'On flip'], ['flip', 'Reveal all'], ['side', 'Alongside']], 'Notes display')}<p class="hint">Double-click any visual to flip it and type notes.</p></section>`}`;
+ <section><h3>Notes</h3>${segH('notesmode', o.notesMode, [['hidden', 'On flip'], ['flip', 'Reveal all'], ['side', 'Alongside']], 'Notes display')}<p class="hint">Double-tap or right-click a visual and choose Notes to flip it and type notes.</p></section>`}`;
 }
 function layersBody() {
   const o = cur(), p = pg(), tp = ui.mode === 'wf' ? tplOf(o) : null;
@@ -886,16 +890,7 @@ function pageDialog() {
  <div class="df"><button class="danger" data-act="pagedel" style="margin-right:auto" ${n > 1 ? '' : 'disabled'}>Delete page</button><button class="primary" data-act="closedlg">Done</button></div>`;
   if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
 }
-function libClick(type) {
-  const v = ui.sel ? findV(ui.sel) : null;
-  if (!v || ui.multi.size) { ui.multi.clear(); return addVisual(type); }
-  if (v.type === type) return toast(`This visual is already a ${TYPES[type].name.toLowerCase()}`);
-  const dlg = $('#dlg'), keeps = DATA_TYPES.includes(v.type) && DATA_TYPES.includes(type) ? 'position, size, measure, styling and notes' : 'position, size, styling and notes';
-  dlg.innerHTML = `<div class="dh"><h2 id="dlgTitle">Change visual type</h2><button class="icon" data-act="closedlg" aria-label="Close">${I.x}</button></div>
- <div class="db"><p style="margin:0">Change <b>${esc(vName(v))}</b> from ${TYPES[v.type].name.toLowerCase()} to ${TYPES[type].name.toLowerCase()}?</p><p class="hint">It keeps its ${keeps}. Settings the new type doesn’t use go back to their defaults.</p></div>
- <div class="df"><button data-act="closedlg">Cancel</button><button class="primary" data-act="chtype" data-id="${v.id}" data-type="${type}">Change to ${TYPES[type].name.toLowerCase()}</button></div>`;
-  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
-}
+function libClick(type) { ui.multi.clear(); addVisual(type); }
 function changeType(v, type) {
   const d = vDefaults(type, model()), keep = ['id', 'x', 'y', 'w', 'h', 'title', 'titleAuto', 'notes', 'ov', 'hidden'];
   if (DATA_TYPES.includes(v.type) && DATA_TYPES.includes(type)) keep.push('mid', 'paramId', 'sort', 'ref', 'drill');
@@ -947,6 +942,99 @@ function nudge(key) {
 }
 // Keeps the edit sheet's position fields in step after a drag, a nudge or a typed value.
 function syncPos() { const v = ui.panel === 'visual' && ui.sel ? findV(ui.sel) : null; if (v) document.querySelectorAll('[data-pos]').forEach(i => { if (document.activeElement !== i) i.value = v[i.dataset.pos]; }); }
+/* ---------- clipboard ---------- */
+// The clipboard is in memory (ui.clip): it lasts until the app reloads and carries visuals between pages, wireframes
+// and templates. Copies get fresh ids. Links inside the copied set (a visual and the field-parameter slicer it reads)
+// point at the copies; links to things the target page does not have (its bookmarks, a slicer left behind) are dropped;
+// measures and dimensions the target wireframe's data model does not have go back to that model's defaults.
+const nVis = (vs, verb) => vs.length > 1 ? `${verb} ${vs.length} visuals` : `${verb} ${vName(vs[0])}`;
+function copySel() {
+  const ids = selIds(), vs = pg().visuals.filter(v => ids.includes(v.id)); if (!vs.length) return null;
+  ui.clip = { vs: clone(vs), doc: cur().id, page: pg().id, n: {} }; return vs;
+}
+function copyKey() { const vs = copySel(); if (vs) toast(nVis(vs, 'Copied')); }
+function cutKey() { const vs = copySel(); if (vs) toast(nVis(vs, 'Cut'), ['Undo', removeVisuals(vs.map(v => v.id))]); }
+// A visual pasted into another wireframe keeps its own measure and fields only where that wireframe's model has them.
+function fitModel(v, md) {
+  const ms = new Set(md.measures.map(m => m.id)), ds = new Set(md.dims.map(d => d.id)), okD = k => !k || D.isTime(k) || ds.has(k), d = vDefaults(v.type, md);
+  if (v.mid && !ms.has(v.mid)) v.mid = d.mid;
+  if (v.m2 && !['ly', 'bud'].includes(v.m2) && !ms.has(v.m2)) v.m2 = '';
+  v.params = (v.params || []).filter(id => ms.has(id)); if (!v.params.length) v.params = d.params;
+  const dim0 = v.dim, sub0 = (v.sub || []).join();
+  if (!okD(v.dim)) { v.dim = d.dim; v.periods = d.periods; }
+  if (!okD(v.legend)) v.legend = '';
+  if (!okD(v.cols)) v.cols = '';
+  v.sub = (v.sub || []).filter(k => k && okD(k) && k !== v.dim);
+  if (v.dim !== dim0 || v.sub.join() !== sub0) v.open = [];
+}
+// at: a page point (the canvas menu pastes where it was opened). Otherwise each paste on the page the visuals came
+// from steps two grid squares down and right, and on another page the first paste lands in the same place.
+function pasteClip(at) {
+  const c = ui.clip; if (!c) return;
+  const o = cur(), p = pg(), tpl = ui.mode === 'tpl', src = c.vs.filter(v => !tpl || LAYOUT_TYPES.includes(v.type)), skipped = c.vs.length - src.length;
+  if (!src.length) return toast('Templates hold layout elements only, so there is nothing here to paste');
+  let txt = JSON.stringify(src); src.forEach(v => txt = txt.split(`"${v.id}"`).join(`"${uid()}"`));
+  const nv = JSON.parse(txt), mine = new Set(nv.map(v => v.id));
+  nv.forEach(v => {
+    if (v.paramId && !mine.has(v.paramId) && !p.visuals.some(x => x.id === v.paramId && x.type === 'slicer')) v.paramId = '';
+    if (v.bmId && !(p.bookmarks || []).some(b => b.id === v.bmId)) { v.bmId = ''; v.action = 'none'; }
+    if (!tpl && c.doc !== o.id) fitModel(v, model());
+  });
+  const x0 = Math.min(...nv.map(v => v.x)), y0 = Math.min(...nv.map(v => v.y)), x1 = Math.max(...nv.map(v => v.x + v.w)), y1 = Math.max(...nv.map(v => v.y + v.h));
+  let dx, dy;
+  if (at) { dx = snapV(at.x) - x0; dy = snapV(at.y) - y0; }
+  else {
+    const key = `${o.id}/${p.id}`, home = key === `${c.doc}/${c.page}` && p.visuals.some(x => c.vs.some(s => s.id === x.id));
+    const k = (c.n[key] || 0) + (home ? 1 : 0); c.n[key] = (c.n[key] || 0) + 1; dx = dy = k * o.grid.size * 2;
+  }
+  dx = Math.max(-x0, Math.min(dx, pw() - x1)); dy = Math.max(-y0, Math.min(dy, ph() - y1));
+  nv.forEach(v => { v.w = Math.min(v.w, pw()); v.h = Math.min(v.h, ph()); v.x = clamp(v.x + dx, 0, pw() - v.w); v.y = clamp(v.y + dy, 0, ph() - v.h); });
+  p.visuals.push(...nv);
+  ui.multi = new Set(nv.length > 1 ? nv.map(v => v.id) : []); ui.sel = nv[nv.length - 1].id;
+  if (ui.panel === 'visual' && nv.length > 1) ui.panel = 'tab';
+  renderPage(); setSel(ui.sel); renderPanel(); save();
+  toast(nVis(nv, 'Pasted') + (skipped ? `. ${skipped} not pasted: templates hold layout elements only` : ''), ['Undo', () => removeVisuals([...mine])]);
+}
+function changeTypeUndo(v, type) {
+  const p = pg(), old = clone(v); changeType(v, type);
+  toast(`Changed to ${TYPES[type].name.toLowerCase()}`, ['Undo', () => { const i = p.visuals.findIndex(x => x.id === old.id); if (i < 0) return; p.visuals[i] = old; ui.vdata.delete(old.id); if (p === pg() && ui.view === 'editor') { renderPage(); openSheet(old.id); } save(); }]);
+}
+
+/* ---------- visual menu ---------- */
+// Right-click, or double-tap / double-click, on a visual: change type, notes, copy, paste, delete (on a multi-selection:
+// copy, paste, delete). On empty canvas: paste, at that spot. In Sketch mode a right-click opens the tool ring instead.
+let vmenu = null;
+function closeMenu() { if (vmenu) { vmenu.el.remove(); vmenu = null; } }
+function openMenu(cx, cy, id) {
+  closeMenu(); clearQS(); $('#tip').hidden = true;
+  if (id && !selIds().includes(id)) { ui.multi.clear(); setSel(id); if (ui.panel === 'visual') renderPanel(); else refreshSide(); }
+  const r = $('#page').getBoundingClientRect(), el = document.createElement('div');
+  el.className = 'vmenu'; el.setAttribute('role', 'menu');
+  vmenu = { el, view: 'main', t: performance.now(), ctx: { id, cx, cy, at: { x: (cx - r.left) / ui.scale, y: (cy - r.top) / ui.scale } } };
+  document.body.appendChild(el); menuHTML();
+}
+function menuHTML() {
+  const { el, view, ctx } = vmenu, v = ctx.id ? findV(ctx.id) : null, n = v ? selIds().length : 0, it = (val, icon, label, ex = '') => `<button role="menuitem" data-act="vm" data-val="${val}" ${ex}>${I[icon]}<span>${label}</span></button>`;
+  const paste = it('paste', 'paste', 'Paste', ui.clip ? '' : 'disabled');
+  if (view === 'types') {
+    const types = Object.entries(TYPES).filter(([k]) => ui.mode !== 'tpl' || LAYOUT_TYPES.includes(k));
+    el.innerHTML = `${it('back', 'back', 'Change type')}<div class="vmtypes">${types.map(([k, t]) => `<button role="menuitem" data-act="vmtype" data-type="${k}" ${k === v.type ? 'aria-current="true" disabled' : ''}>${I[k]}<span>${t.name}</span></button>`).join('')}</div>`;
+  } else if (!v) el.innerHTML = paste;
+  else el.innerHTML = `<div class="vmhead">${esc(n > 1 ? `${n} visuals` : vName(v))}</div>${n > 1 ? '' : it('types', 'swap', 'Change type') + (ui.mode === 'tpl' ? '' : it('notes', 'notes', ui.flipped.has(v.id) ? 'Hide notes' : 'Notes'))}${it('copy', 'copy', 'Copy')}${paste}<span class="sep"></span>${it('delete', 'trash', 'Delete', 'class="danger"')}`;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = clamp(ctx.cx + 4, 8, innerWidth - w - 8) + 'px'; el.style.top = (ctx.cy + 4 + h > innerHeight - 8 ? Math.max(8, ctx.cy - h - 4) : ctx.cy + 4) + 'px';
+  el.querySelector('button:not([disabled])')?.focus({ preventScroll: true });
+}
+function vmAct(val) {
+  if (!vmenu) return;
+  const { ctx } = vmenu, v = ctx.id ? findV(ctx.id) : null;
+  if (val === 'types' || val === 'back') { vmenu.view = val === 'types' ? 'types' : 'main'; return menuHTML(); }
+  closeMenu();
+  if (val === 'copy') copyKey();
+  else if (val === 'paste') pasteClip(v ? null : ctx.at);
+  else if (val === 'delete') deleteKey();
+  else if (val === 'notes' && v) { if (v.hidden && !ui.flipped.has(v.id)) { v.hidden = false; renderPage(); save(); } flipOne(v.id); }
+}
 function download(name, text, type = 'text/csv') { const url = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); }
 
 /* ---------- pointer: canvas ---------- */
@@ -974,6 +1062,8 @@ function syncZoom() {
 }
 document.addEventListener('pointerdown', e => {
   if (ui.view !== 'editor') return;
+  ui.downT = performance.now();
+  if (vmenu && !e.target.closest('.vmenu')) closeMenu();
   const lib = e.target.closest('.libitem'); if (lib) return libDown(e, lib);
   if (qs && !e.target.closest('.qschip')) clearQS();
   if (ring && ring.pointerId == null && !e.target.closest('.skring')) closeRing();
@@ -993,9 +1083,18 @@ document.addEventListener('pointerdown', e => {
   const draws = ui.mode === 'wf' && e.button === 0 && (kind === 'pen' ? (ui.sk.on || o.pencilDraws === true) : kind === 'touch' ? (ui.sk.on && o.fingerDraws === true) : ui.sk.on);
   if (draws && !e.target.closest('textarea,.nhead button,.vhdr')) return sketchDown(e, page);
   const el = e.target.closest('.vis[data-id]');
-  if (!el) { clearSel(); return; }
+  if (!el) {   // a double-tap on empty canvas opens the menu (Paste)
+    clearSel(); if (e.button !== 0) return;
+    const now = Date.now(), l = ui.lastE;
+    if (l && now - l.t < 380 && Math.hypot(e.clientX - l.x, e.clientY - l.y) < 24) { ui.lastE = null; openMenu(e.clientX, e.clientY, null); } else ui.lastE = { t: now, x: e.clientX, y: e.clientY };
+    return;
+  }
   if (e.target.closest('button,textarea,.back') || e.button !== 0) return;
-  if (e.ctrlKey || e.metaKey || e.shiftKey || ui.multiMode) { toggleMulti(el.dataset.id); return; }
+  if (e.ctrlKey || e.metaKey || e.shiftKey || ui.multiMode) {   // two quick toggles leave the selection as it was and open the menu
+    const id = el.dataset.id, now = Date.now(); toggleMulti(id);
+    if (ui.lastM && ui.lastM.id === id && now - ui.lastM.t < 380) { ui.lastM = null; openMenu(e.clientX, e.clientY, id); } else ui.lastM = { id, t: now };
+    return;
+  }
   const v = findV(el.dataset.id), hEl = e.target.closest('.vrs'), dir = hEl ? hEl.dataset.h : null, resize = !!dir, target = e.target, g = cur().grid;
   const st = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, vw: v.w, vh: v.h }; let moved = false;
   const group = !resize && ui.multi.has(v.id) ? pg().visuals.filter(x => ui.multi.has(x.id)).map(x => ({ v: x, x: x.x, y: x.y, el: document.querySelector(`.vis[data-id="${x.id}"]`) })) : null;
@@ -1024,12 +1123,12 @@ document.addEventListener('pointerdown', e => {
     try { el.releasePointerCapture(e.pointerId); } catch (_) {}
     if (moved) { if (group) group.forEach(g => { g.v.x = g.x; g.v.y = g.y; }); else Object.assign(v, { x: st.vx, y: st.vy, w: st.vw, h: st.vh }); renderPage(); }
   };
-  const up = () => {
+  const up = ev => {
     dragCancel = null;
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.classList.remove('dragging');
     if (moved) { if (resize || cur().notesMode === 'side' || ui.dropOpen === v.id || hasBound(group ? group.map(g => g.v) : [v])) renderPage(); syncPos(); save(); return; }
     if (group) ui.multi.clear();
-    clickVisual(v, target);
+    clickVisual(v, target, ev);
   };
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 });
@@ -1057,13 +1156,21 @@ const touchEnd = e => {
 };
 // iPad Safari can still pan the stage under touch-action:none, which cancels the drag. Block the native pan on visuals and while drawing.
 document.addEventListener('touchmove', e => { if (ui.view === 'editor' && (ui.drawing || (e.touches && e.touches.length > 1 && e.target.closest && e.target.closest('#stage')) || (e.target.closest && e.target.closest('#page .vis[data-id]') && !e.target.closest('textarea')))) e.preventDefault(); }, { passive: false });
-document.addEventListener('contextmenu', e => { if (ui.view === 'editor' && ui.sk.on && ui.mode === 'wf' && e.target.closest('#page')) { e.preventDefault(); openRing(e.clientX, e.clientY, null); } });
+// Right-click on the page: the tool ring in Sketch mode, otherwise the visual menu (or Paste on empty canvas).
+// A notes field keeps the browser's own menu.
+document.addEventListener('contextmenu', e => {
+  if (ui.view !== 'editor' || !e.target.closest('#page')) return;
+  if (ui.sk.on && ui.mode === 'wf') { e.preventDefault(); openRing(e.clientX, e.clientY, null); return; }
+  if (e.target.closest('textarea,input')) return;
+  e.preventDefault(); const el = e.target.closest('.vis[data-id]'); openMenu(e.clientX, e.clientY, el ? el.dataset.id : null);
+});
 // Safari's own pinch would zoom the whole app instead of the canvas
 document.addEventListener('gesturestart', e => { if (ui.view === 'editor') e.preventDefault(); });
 document.addEventListener('pointerup', touchEnd); document.addEventListener('pointercancel', touchEnd);
-function clickVisual(v, target) {
+// A second tap or click within 380 ms opens the visual menu, and undoes any highlight the first one made.
+function clickVisual(v, target, ev) {
   const now = Date.now();
-  if (ui.last && ui.last.id === v.id && now - ui.last.t < 380) { ui.last = null; if (ui.hl !== ui.hlBefore) { ui.hl = ui.hlBefore; renderPage(); } flipOne(v.id); return; }
+  if (ui.last && ui.last.id === v.id && now - ui.last.t < 380) { ui.last = null; if (ui.hl !== ui.hlBefore) { ui.hl = ui.hlBefore; renderPage(); } openMenu(ev.clientX, ev.clientY, v.id); return; }
   ui.last = { id: v.id, t: now }; ui.hlBefore = ui.hl;
   openSheet(v.id);
   if (v.type === 'button') { if (v.action === 'bookmark' && v.bmId) applyBm(v.bmId); return; }
@@ -1458,7 +1565,9 @@ document.addEventListener('click', e => {
     case 'add': if (e.detail === 0) libClick(b.dataset.type); break;
     case 'multimode': ui.multiMode = !ui.multiMode; renderArrange(); break;
     case 'arrange': arrange(b.dataset.val); break;
-    case 'chtype': { const cv = findV(id); closeDlg(); if (cv) changeType(cv, b.dataset.type); break; }
+    // A menu opened by a second touch can appear under the finger: only a press that began after it opened counts.
+    case 'vm': if (vmenu && ui.downT > vmenu.t) vmAct(b.dataset.val); break;
+    case 'vmtype': { if (!vmenu || ui.downT < vmenu.t) break; const mv = vmenu && findV(vmenu.ctx.id); closeMenu(); if (mv && mv.type !== b.dataset.type) changeTypeUndo(mv, b.dataset.type); break; }
     case 'libmin': ui.libMin = !ui.libMin; try { localStorage.setItem('datasketch-libmin', ui.libMin ? '1' : '0'); } catch (e) {} $('.lib').outerHTML = libHTML(); fit(); break;
     case 'gopage': if (id !== pg().id) goPage(id); break;
     case 'addpage': addPage(); break;
@@ -1638,14 +1747,21 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   const el = e.target;
   if (e.key === 'Escape' && ring) { closeRing(); return; }
-  const onCanvas = ui.view === 'editor' && (ui.sel || ui.multi.size) && !$('#dlg').open && !el.closest?.('input,textarea,select');
+  if (e.key === 'Escape' && vmenu) { closeMenu(); return; }
+  const free = ui.view === 'editor' && !$('#dlg').open && !el.closest?.('input,textarea,select'), onCanvas = free && (ui.sel || ui.multi.size);
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && free) {
+    const k = e.key.toLowerCase();
+    if (k === 'c' && onCanvas) { e.preventDefault(); closeMenu(); copyKey(); return; }
+    if (k === 'x' && onCanvas) { e.preventDefault(); closeMenu(); cutKey(); return; }
+    if (k === 'v' && ui.clip) { e.preventDefault(); closeMenu(); pasteClip(); return; }
+  }
   if (e.key === 'Escape' && onCanvas) { clearSel(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && onCanvas && !e.metaKey && !e.ctrlKey) { e.preventDefault(); deleteKey(); return; }
   if (e.key.startsWith('Arrow') && onCanvas && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); nudge(e.key); return; }
   if (!el.classList || !el.classList.contains('vis') || el.classList.contains('locked')) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(el.dataset.id, true); }
 });
-window.addEventListener('resize', () => { if (ui.view === 'editor') fit(); });
+window.addEventListener('resize', () => { closeMenu(); if (ui.view === 'editor') fit(); });
 
 /* ---------- service worker ---------- */
 function showUpdate(reg) {

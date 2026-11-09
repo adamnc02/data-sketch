@@ -6,7 +6,7 @@ model, so clients react to the layout and the story rather than to real numbers.
 client's styling and page layout; wireframes have pages, bookmarks, layers, notes and Pencil sketches.
 
 Live at **https://adamnc02.github.io/data-sketch/**, served by GitHub Pages from the root of `main`, and
-made to be added to an iPad Home Screen. **Status: 1.3.3.**
+made to be added to an iPad Home Screen. **Status: 1.4.0.**
 
 ## Stack
 
@@ -37,10 +37,22 @@ offline once loaded.
   with snap; drag from the library or tap to add; move and resize from every edge, or type the X, Y, width
   and height in the edit sheet.
 - **Keyboard:** Delete (or Backspace) deletes the selected visuals, with Undo in the message that follows.
-  The arrow keys nudge the selection: one grid step with snap on, 1px with it off.
+  The arrow keys nudge the selection: one grid step with snap on, 1px with it off. Cmd or Ctrl + C, X and V
+  copy, cut and paste.
+- **Visual menu:** right-click a visual, or double-tap it (double-click with a mouse), for Change type, Notes,
+  Copy, Paste and Delete; on a multi-selection, Copy, Paste and Delete. Right-click or double-tap empty canvas
+  for Paste, which is greyed out until something has been copied. In Sketch mode a right-click opens the tool
+  ring instead. Change type and Delete happen at once, with Undo in the message that follows.
+- **Copy and paste:** one visual or a multi-selection, between pages, wireframes and templates, until the app
+  is reloaded. On the page it was copied from, each paste lands two grid steps lower and further right; on
+  another page it lands in the same place; from the canvas menu it lands where the menu was opened. The pasted
+  visuals are selected, ready to drag. A pasted visual keeps its link to a field-parameter slicer copied with
+  it (or still on the page), and loses links to bookmarks or slicers the new page does not have. In another
+  wireframe, measures and fields its data model does not have go back to that model's defaults. Templates
+  take layout elements only.
 - **Visuals:** card, column, bar, line, area, donut, table, matrix, slicer (list, dropdown, tiles, date range, field
-  parameter), button, page navigator, shape, text box and image. With a visual selected, tapping another type in the
-  library changes it after a confirmation. The library collapses to icons, and on wide screens (iPad
+  parameter), button, page navigator, shape, text box and image. Tapping a type in the library always adds one; Change type
+  in the visual menu changes the selected visual. The library collapses to icons, and on wide screens (iPad
   landscape, desktop) the side panel button in the top bar hides the right panel to give the canvas more room.
 - **Matrix:** up to three row levels (dimensions, or Year, Quarter and Month) with + and − to expand and
   collapse each group, Expand all and Collapse all, subtotals on every group and a grand total. With no
@@ -52,7 +64,7 @@ offline once loaded.
   grid and the data model are shared.
 - **Interactivity:** cross-highlighting from bars, rows and slicers, tooltips, date drill, bookmarks with
   per-visual scope (Shown, Hidden, Not affected) linked to buttons.
-- **Notes:** double-click a visual to flip it and type notes; show them on flip, all at once, or alongside
+- **Notes:** choose Notes in the visual menu to flip a visual and type notes; show them on flip, all at once, or alongside
   the page as numbered pins.
 - **Data tab:** measures (type, format, size, trend, strength, seasonality and stories such as "top
   performer"), dimensions and member names, currency, regenerate values, and export of a star schema as
@@ -105,8 +117,8 @@ It lives in each template's and wireframe's settings. There is no fixed page siz
 Every visual of a measure then tells the same story and totals reconcile across visuals.
 
 ### Destructive actions confirm with a second tap (`arm()`), never `confirm()`.
-Full-backup import confirms in its own dialog. The Delete key is the one exception: it deletes at once and
-its message offers Undo.
+Full-backup import confirms in its own dialog. The Delete key and the visual menu's Delete and Change type are
+the exceptions: they act at once and their message offers Undo.
 
 ### All user text goes through `esc()` before it is put into HTML.
 

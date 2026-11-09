@@ -67,7 +67,9 @@ icons/                  favicons, apple-touch-icon, PWA icons, mark.svg (vector 
   (cross-highlight), `slicerSel`, `paramSel`, `dropOpen`, `sk` (sketch tool, colour, sizes, `stab` stability per tool, `open` / `pinned` brushes row, `prev` tool for
   the eraser swap),
   `skUndo` / `skRedo`, `drawing`, `ghost` (show hidden visuals faintly), `vdata` (computed visual data for
-  tooltips), `exportCache`.
+  tooltips), `exportCache`, `clip` (the clipboard: copied visuals, the wireframe or template and page they came from,
+  and a paste count per page), `last` / `lastE` / `lastM` (the previous tap on a visual, on empty canvas and in
+  multi-select, for double-tap), `downT` (time of the last `pointerdown`).
 - `cur()` is the wireframe or template being edited. `pg()` is the active page: the wireframe page whose id
   is `pageId` (else the first), or the template itself. `findV(id)` looks in `pg()`. `model()` is the
   wireframe's data model. `pw()` / `ph()` are the canvas width and height from `cur().settings`.
@@ -195,14 +197,20 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
   measures, `data-mxsub` matrix row levels, `data-notes`, `data-wfname`, `data-pgname`. One `change`
   listener handles zoom, the canvas size controls (`data-cs`) and the position fields (`data-pos`), so a
   half-typed number never moves anything, and file inputs (`data-import`, `data-vimg`, `data-logo`).
-- One `keydown` listener: Escape closes the ring or clears the selection; with a selection and focus outside
-  any field or dialog, Delete or Backspace calls `deleteKey()` and the arrow keys call `nudge()`; Enter or
-  Space on a focused visual opens its edit sheet.
+- One `keydown` listener: Escape closes the ring or the visual menu, or clears the selection; with focus outside
+  any field or dialog, Cmd or Ctrl + V calls `pasteClip()`, and with a selection Cmd or Ctrl + C and X call
+  `copyKey()` and `cutKey()`, Delete or Backspace calls `deleteKey()` and the arrow keys call `nudge()`; Enter
+  or Space on a focused visual opens its edit sheet.
+- One `contextmenu` listener: on the page in Sketch mode it opens the tool ring; otherwise it opens the visual
+  menu (`openMenu()`) for the visual under the pointer or, on empty canvas, the canvas menu. A notes textarea
+  keeps the browser's own menu.
 - One `pointerdown` listener handles library drag (drag preview `.dragghost`), visual move and resize
-  (8 handles, grid snap), click and double-click (click opens the edit sheet and runs interactions;
-  double-click flips to notes), multi-select and sketching.
+  (8 handles, grid snap), click and double-tap (a click opens the edit sheet and runs interactions; a second
+  tap on the same visual within 380 ms opens the visual menu and undoes any highlight the first made; two taps
+  within 380 ms and 24px on empty canvas open the canvas menu), multi-select and sketching.
 - Destructive actions use `arm(btn, label, fn)`: the first tap changes the label, the second acts. The
-  Delete key is the exception: `removeVisuals()` returns a function that restores the page's visuals and
+  Delete key, and the visual menu's Delete and Change type (`changeTypeUndo()` restores the old visual), are the
+  exceptions: `removeVisuals()` returns a function that restores the page's visuals and
   bookmarks, and `deleteKey()` offers it as Undo in the toast (`toast(msg, [label, fn])`, 6 seconds). Dialogs
   use the single `<dialog id="dlg">`; `alert()` and `confirm()` are not used.
 - All user text goes through `esc()` when building HTML.
@@ -212,9 +220,9 @@ Sketch stroke: `{ tool, c, w, pts: [[x, y, pressure, tilt?], ...], shape?, fill?
 
 ### Library and changing a visual's type
 `libHTML()` builds the library; the chevron collapses it to icons (`.lib.min`, 58px column on wide
-screens). A tap calls `libClick(type)`: with nothing selected (or several selected) it adds a visual at a
-free spot (`freeSpot()`); with one visual selected it opens "Change visual type", and `changeType()`
-replaces the visual with the new type's defaults, keeping id, position, size, title, styling overrides,
+screens). A tap calls `libClick(type)`, which always adds a visual at a free spot (`freeSpot()`), whatever is
+selected. Change type in the visual menu lists the types (layout elements only in a template) and calls
+`changeTypeUndo()`; `changeType()` replaces the visual with the new type's defaults, keeping id, position, size, title, styling overrides,
 notes and hidden state, plus measure fields between data visuals and second measure, legend and mode
 between column, bar, line and area. Bookmarks and links keep working because the id is kept. Dragging from
 the library always adds.
@@ -227,6 +235,43 @@ align left/centre/right/top/middle/bottom to the selection's bounding box, and d
 vertically (three or more; first and last stay, gaps become equal). `arrange(how)` applies them. Dragging a
 selected visual moves the whole group, clamped so every member stays on the page; a plain click on one
 member selects just that visual.
+
+### Visual menu
+`openMenu(x, y, id)` builds a fixed `.vmenu` at the pointer, kept inside the viewport. On a visual (selected
+first if it is not already in the selection): its name, Change type (swaps the menu to the type list, with a
+back row), Notes or Hide notes (wireframes only; `flipOne()`, unhiding a hidden visual first), Copy, Paste and
+Delete. On a multi-selection: "n visuals", Copy, Paste, Delete. On empty canvas, including locked template
+layout: Paste only. Paste is disabled while `ui.clip` is empty. Any `pointerdown` outside the menu, Escape or a
+window resize closes it.
+
+🚨 **A menu opened by a touch can appear under the finger.** The empty-canvas and Select multiple double-taps
+open the menu on the second `pointerdown`, and near the right edge the menu is pulled left over the finger, so
+lifting it would click whatever item is there. Menu items act only when `ui.downT` (the last `pointerdown`) is
+later than the menu's opening time.
+
+### Copy and paste
+`copySel()` puts a deep copy of the selected visuals, in page order, in `ui.clip` with the wireframe or
+template id and page id they came from. The clipboard is in memory only: it does not survive a reload and is
+not the system clipboard. `cutKey()` copies, then removes with Undo like `deleteKey()`.
+
+`pasteClip(at)`:
+- Gives every pasted visual a fresh id by replacing each copied id in the clip's JSON, so a visual and the
+  field-parameter slicer it reads, copied together, stay linked to each other's copies.
+- Drops a `paramId` that is neither in the pasted set nor a slicer on the target page, and a `bmId` the
+  target page has no bookmark for (the button's action becomes none). Bookmarks are per page, so a button
+  pasted onto another page always loses its bookmark. New visuals are not added to existing bookmarks.
+- In a different wireframe, `fitModel()` resets measure and field references the target model does not have:
+  `mid` to the model's default, `m2` to none, `params` filtered (default if none are left), `dim` (and
+  `periods`) to the type's default, `legend` and `cols` to none, `sub` filtered; a matrix whose levels changed
+  loses `open`. Time keys always survive.
+- In a template, only layout types (`LAYOUT_TYPES`) are pasted; the message counts those left out.
+- Position: with `at` (the canvas menu), the group's top-left goes to that point, snapped. Otherwise each
+  paste steps two grid squares down and right: on the page the visuals came from, the first paste is already
+  one step on while the originals are there (after a cut it lands in place); on another page the first paste
+  lands in the same place. The group is then clamped onto the page, and each visual shrunk to fit a smaller
+  canvas.
+- The pasted visuals go on top, are selected (as a multi-selection when there are several), and the message
+  offers Undo, which removes them.
 
 ### Position and keyboard
 The edit sheet's Position and size section has X, Y, Width and Height fields (`data-pos`), applied on
@@ -284,7 +329,8 @@ box if it is wider than the box; the measured width is capped at the box.
 - Layers: front-to-back order, show or hide, select, move forward or backward, show hidden visuals faintly.
 - Bookmarks: add from the current view, apply, rename, update from the view, delete, and set each visual
   to Shown, Hidden or Not affected. A button visual can apply a bookmark on click.
-- Notes: double-click flips a visual to a notes card. Display modes: On flip, Reveal all, Alongside
+- Notes: Notes in the visual menu flips a visual to a notes card (so does Flip to notes in the edit sheet);
+  Done on the card or Hide notes in the menu flips it back. Display modes: On flip, Reveal all, Alongside
   (numbered pins plus a notes rail beside the page).
 - Data tab: measures, dimensions, currency, regenerate values (new seed, same settings), CSV and DAX export.
 
@@ -455,6 +501,19 @@ Safari does not. Use WebKit for layout measurements, Chromium for how things loo
   Sketch off. Tips: nine rows, visible at the bottom of the rail. Stability:
   each tool shows its default, the eraser has none, the same zigzag at 90 is much shorter than at 0 and
   still ends at the lift point, and the value survives a reload.
+- Visual menu: right-click a visual lists Change type, Notes, Copy, Paste (greyed until a copy) and Delete;
+  right-click and double-tap on empty canvas list Paste only; a mouse double-click and a finger double-tap on a
+  visual open it and do not flip; a multi-selection's menu (right-click, or double-tap in Select multiple) is
+  Copy, Paste, Delete and keeps the selection; a template's menu has no Notes and its type list is layout
+  elements; Change type and Delete happen at once and Undo restores; Notes and Hide notes flip; Escape and a tap
+  outside close it; it fits the viewport at every size, also in WebKit; a double-tap at the right edge opens it
+  under the finger without pasting, and a fresh tap on Paste pastes. A library tap with a visual selected adds.
+- Copy and paste: same page steps 30px (grid 15) per paste, clamped to the page; another page lands in place
+  and then steps; the canvas menu pastes at the spot; a multi-selection pastes as a selected group; cut then
+  paste lands in place; Undo removes a paste; a card and its field-parameter slicer copied together stay
+  linked, a card alone keeps the original slicer on its page, and loses it on another page; a bookmark button
+  keeps its bookmark on its page and loses it elsewhere; into a wireframe with a different data model every
+  measure and field is in that model and the visuals render; a template takes the layout elements only.
 - Keyboard: Delete and Backspace delete one or a multi-selection, Undo restores them; Backspace in a field
   does not; arrows move one grid step with snap and 1px without, and the X field follows; typed X and an
   oversized width are clamped to the page.
@@ -492,6 +551,9 @@ scrolling, Add to Home Screen and offline launch.
   span widths, which match the canvas `measureText()` in both engines.
 - **A following page-name box's position is not rounded.** Rounding it to whole pixels left the two gaps
   either side of the `|` up to half a pixel apart, which shows at Fit zoom on a large title.
+- **A test point near a visual's edge can land on it.** Clearing the selection changes the iPad layout by a few
+  pixels, so a tap meant for empty canvas a few page pixels from a visual hits the visual. Use points clearly
+  inside empty space (a locked template element counts as empty).
 - **Stacking.** Each `.vis` is its own stacking context (3D flip). A handle of a selected visual can sit
   under a neighbour that overlaps it.
 - **Second measure axis.** Last year and budget share the primary axis; only other measures use the right
